@@ -1,62 +1,16 @@
 variable "environment" {
   description = "The environment for the VPC (e.g., dev, prod)"
   type        = string
-
-  validation {
-    condition     = contains(["dev", "prod", "staging"], var.environment)
-    error_message = "Environment must be one of 'dev', 'prod', or 'staging'."
-  }
 }
 
-variable "aws_region" {
-  description = "The AWS region to deploy resources in"
+variable "vpc_id" {
+  description = "The ID of the VPC where EC2 instances will be launched"
   type        = string
-  default     = "us-east-1"
 }
 
-variable "vpc_cidr" {
-  description = "The CIDR block for the VPC"
+variable "subnet_ids" {
+  description = "The subnet ID where EC2 instances will be launched"
   type        = string
-
-  validation {
-    condition     = can(cidrhost(var.vpc_cidr, 0))
-    error_message = "VPC CIDR must be a valid CIDR block."
-  }
-}
-
-variable "availability_zones" {
-  description = "A list of availability zones for the VPC"
-  type        = list(string)
-}
-
-variable "project_name" {
-  description = "Project name for resource naming"
-  type        = string
-  default     = "cost-optimizer"
-}
-
-variable "nat_gateway_enabled" {
-  description = "Enable NAT Gateway"
-  type        = bool
-  default     = false
-}
-
-variable "nat_gateway_single" {
-  description = "Use a single NAT Gateway for the VPC"
-  type        = bool
-  default     = false
-}
-
-variable "dns_support_enabled" {
-  description = "Enable DNS support in the VPC"
-  type        = bool
-  default     = true
-}
-
-variable "dns_hostnames_enabled" {
-  description = "Enable DNS hostnames in the VPC"
-  type        = bool
-  default     = true
 }
 
 variable "security_group_ids" {
@@ -122,7 +76,7 @@ variable "storage_type" {
 
   validation {
     condition     = contains(["gp2", "gp3", "io2"], var.storage_type)
-    error_message = "Storage type must be one of 'gp2', 'gp3', 'io2'"
+    error_message = "Storage type must be one of 'gp2', 'gp3', 'io2'."
   }
 }
 
@@ -135,7 +89,7 @@ variable "enable_monitoring" {
 variable "enable_kubernetes" {
   description = "Enable Kubernetes support for the EC2 instances"
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "kubernetes_version" {
@@ -144,25 +98,13 @@ variable "kubernetes_version" {
   default     = "1.21"
 }
 
-variable "ssh_access_cidr" {
-  description = "The CIDR block allowed to access EC2 instances via SSH"
-  type        = list(string)
-  default     = ["0.0.0.0/0"]
-
-  validation {
-    condition     = alltrue([for cidr in var.ssh_access_cidr : can(cidrhost(cidr, 0))])
-    error_message = "All SSH access CIDR blocks must be valid."
-  }
-}
-
-variable "ssh_key_path" {
-  description = "The path to the SSH public key file"
+variable "project_name" {
+  description = "The name of the project for tagging purposes"
   type        = string
-  default     = ""
 }
 
 variable "tags" {
-  description = "A map of tags to assign to the VPC"
+  description = "A map of tags to assign to the EC2 instances"
   type        = map(string)
   default     = {}
 }
