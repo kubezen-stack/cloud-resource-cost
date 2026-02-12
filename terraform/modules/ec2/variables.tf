@@ -10,7 +10,7 @@ variable "vpc_id" {
 
 variable "subnet_ids" {
   description = "The subnet ID where EC2 instances will be launched"
-  type        = string
+  type        = list(string)
 }
 
 variable "security_group_ids" {
@@ -44,6 +44,7 @@ variable "instance_count" {
 variable "key_name" {
   description = "The name of the key pair to use for EC2 instances"
   type        = string
+  default     = ""
 }
 
 variable "ami_id" {

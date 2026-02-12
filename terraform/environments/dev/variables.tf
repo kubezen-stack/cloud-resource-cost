@@ -68,7 +68,7 @@ variable "security_group_ids" {
 variable "instance_type" {
   description = "The EC2 instance type"
   type        = string
-  default     = "t3.medium"
+  default     = "t3.small"
 
   validation {
     condition     = can(regex("^(t3\\.small|t3\\.medium|t3\\.large)$", var.instance_type))
@@ -90,6 +90,7 @@ variable "instance_count" {
 variable "key_name" {
   description = "The name of the key pair to use for EC2 instances"
   type        = string
+  default     = ""
 }
 
 variable "ami_id" {
@@ -159,6 +160,30 @@ variable "ssh_key_path" {
   description = "The path to the SSH public key file"
   type        = string
   default     = ""
+}
+
+variable "enable_cost_explorer" {
+  description = "Enable Cost Explorer API permissions"
+  type        = bool
+  default     = false
+}
+
+variable "enable_cloudwatch" {
+  description = "Enable CloudWatch API permissions"
+  type        = bool
+  default     = true
+}
+
+variable "enable_vault_auth" {
+  description = "Enable permissions for EC2 instances to access AWS Systems Manager Parameter Store for secure value retrieval"
+  type        = bool
+  default     = false
+}
+
+variable "s3_bucket_arns" {
+  description = "List of S3 bucket ARNs to grant access to"
+  type        = list(string)
+  default     = []
 }
 
 variable "tags" {

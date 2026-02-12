@@ -66,7 +66,7 @@ resource "aws_subnet" "private" {
 }
 
 resource "aws_eip" "nat" {
-  count = var.nat_gateway_enabled && var.nat_gateway_single ? 1 : local.public_subnets
+  count = var.nat_gateway_enabled ? (var.nat_gateway_single ? 1 : local.public_subnets) : 0
 
   domain = "vpc"
 

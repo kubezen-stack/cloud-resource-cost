@@ -29,14 +29,15 @@ data "aws_ami" "ubuntu" {
     values = ["ebs"]
   }
 
-  owners = ["576771098395"]
+  owners = ["099720109477"]
 }
 
-resource "aws_availability_zones" "available" {
+data "aws_availability_zones" "available" {
   state = "available"
 }
 
 resource "aws_instance" "ec2_instance" {
+  count                       = var.instance_count
   ami                         = local.ami_id
   instance_type               = var.instance_type
   subnet_id                   = var.subnet_ids[count.index % length(var.subnet_ids)]
@@ -50,17 +51,9 @@ resource "aws_instance" "ec2_instance" {
     volume_type           = var.storage_type
     delete_on_termination = true
     encrypted             = true
-
-    tags = merge(
-      local.common_tags,
-      {
-        Name = "${local.hostname-tag}-node-${count.index + 1}-root"
-      }
-    )
   }
 
   metadata_options {
-    metadata_accessible         = true
     http_endpoint               = "enabled"
     http_tokens                 = "required"
     http_put_response_hop_limit = 1
@@ -132,8 +125,6 @@ resource "aws_cloudwatch_metric_alarm" "cpu_high" {
     InstanceId = aws_instance.ec2_instance[count.index].id
   }
 
-  insufficient_data_actions = []
-
   tags = local.common_tags
 }
 
@@ -153,8 +144,6 @@ resource "aws_cloudwatch_metric_alarm" "status_check_failed" {
   dimensions = {
     InstanceId = aws_instance.ec2_instance[count.index].id
   }
-
-  insufficient_data_actions = []
 
   tags = local.common_tags
 }

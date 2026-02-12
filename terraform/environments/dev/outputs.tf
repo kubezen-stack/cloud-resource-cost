@@ -22,3 +22,28 @@ output "nat_gateway_ids" {
   description = "List of NAT Gateway IDs"
   value       = module.vpc.nat_gateway_ids
 }
+
+output "ec2_instance_ids" {
+  description = "The IDs of the launched EC2 instances"
+  value       = module.ec2.ec2_instance_ids
+}
+
+output "ec2_instance_public_ips" {
+  description = "The public IPs of the launched EC2 instances"
+  value       = module.ec2.ec2_instance_public_ips
+}
+
+output "ec2_instance_private_ips" {
+  description = "The private IPs of the launched EC2 instances"
+  value       = module.ec2.ec2_instance_private_ips
+}
+
+output "ssh_connection_information" {
+  description = "SSH connection information for all EC2 instances"
+  value       = module.ec2.ssh_connection_information
+}
+
+output "ami_id_used" {
+  description = "The AMI ID used for the EC2 instances"
+  value       = module.ec2.ami_id_used
+}

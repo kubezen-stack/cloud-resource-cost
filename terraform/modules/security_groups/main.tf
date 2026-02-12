@@ -86,7 +86,7 @@ resource "aws_security_group_rule" "http" {
     to_port           = 80
     protocol          = "tcp"
     security_group_id = aws_security_group.ec2_sg_id.id
-    cidr_blocks       = var.ssh_access_cidr
+    cidr_blocks       = ["0.0.0.0/0"]
     
     description = "Allow HTTP access"
 }
@@ -97,7 +97,7 @@ resource "aws_security_group_rule" "https" {
     to_port           = 443
     protocol          = "tcp"
     security_group_id = aws_security_group.ec2_sg_id.id
-    cidr_blocks       = var.ssh_access_cidr
+    cidr_blocks       = ["0.0.0.0/0"]
     
     description = "Allow HTTPS access"
 }
@@ -108,7 +108,7 @@ resource "aws_security_group_rule" "ec2_internal" {
   to_port           = 65535
   protocol          = "-1"
   security_group_id = aws_security_group.ec2_sg_id.id
-  cidr_blocks       = var.ssh_access_cidr
+  source_security_group_id = aws_security_group.ec2_sg_id.id
 
   description       = "Allow all internal traffic within the security group"
 }
@@ -144,7 +144,6 @@ resource "aws_security_group_rule" "rds_access_pgsql" {
   protocol          = "tcp"
   source_security_group_id = aws_security_group.ec2_sg_id.id
   security_group_id = aws_security_group.rds.id
-  cidr_blocks       = var.ssh_access_cidr
   description       = "Allow access to RDS PostgreSQL instances"
 }
 
