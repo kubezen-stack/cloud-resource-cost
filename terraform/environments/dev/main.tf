@@ -113,3 +113,18 @@ module "ec2" {
 
   depends_on = [module.vpc, module.security_groups, module.iam]
 }
+
+module "alb" {
+  source                = "../../modules/alb"
+  create_alb            = false
+  project_name          = var.project_name
+  environment           = var.environment
+  vpc_id                = module.vpc.vpc_id
+  public_subnet_ids     = module.vpc.public_subnet_ids
+  alb_security_group_id = module.security_groups.alb_security_group_id != null ? module.security_groups.alb_security_group_id : null
+  ec2_instance_ids      = module.ec2.ec2_instance_ids
+
+  tags = local.common_tags
+
+  depends_on = [module.vpc, module.security_groups, module.ec2]
+}

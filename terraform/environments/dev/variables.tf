@@ -47,6 +47,12 @@ variable "nat_gateway_single" {
   default     = false
 }
 
+variable "public_subnet_ids" {
+  description = "A list of public subnet IDs to associate with the ALB"
+  type        = list(string)
+  default     = []
+}
+
 variable "dns_support_enabled" {
   description = "Enable DNS support in the VPC"
   type        = bool
@@ -184,6 +190,12 @@ variable "s3_bucket_arns" {
   description = "List of S3 bucket ARNs to grant access to"
   type        = list(string)
   default     = []
+}
+
+variable "create_alb" {
+  description = "Whether to create an Application Load Balancer (ALB)"
+  type        = bool
+  default     = false
 }
 
 variable "tags" {

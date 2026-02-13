@@ -164,7 +164,7 @@ resource "aws_security_group_rule" "rds_all_egress" {
   to_port           = 0
   protocol          = "-1"
   security_group_id = aws_security_group.rds.id
-  cidr_blocks       = var.ssh_access_cidr
+  cidr_blocks       = ["0.0.0.0/0"]
   description       = "Allow all outbound traffic"
 }
 
@@ -247,8 +247,8 @@ resource "aws_security_group_rule" "alb_all_egress" {
 resource "aws_security_group_rule" "alb_to_ec2" {
     count                    = var.environment == "prod" ? 1 : 0
     type                     = "egress"
-    from_port                = 0
-    to_port                  = 65535
+    from_port                = 30080
+    to_port                  = 30080
     protocol                 = "tcp"
     source_security_group_id = aws_security_group.ec2_sg_id.id
     security_group_id        = aws_security_group.alb[0].id
@@ -258,8 +258,8 @@ resource "aws_security_group_rule" "alb_to_ec2" {
 resource "aws_security_group_rule" "ec2_to_alb" {
     count                    = var.environment == "prod" ? 1 : 0
     type                     = "ingress"
-    from_port                = 0
-    to_port                  = 65535
+    from_port                = 30080
+    to_port                  = 30080
     protocol                 = "tcp"
     source_security_group_id = aws_security_group.alb[0].id
     security_group_id        = aws_security_group.ec2_sg_id.id
