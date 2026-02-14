@@ -128,3 +128,34 @@ module "alb" {
 
   depends_on = [module.vpc, module.security_groups, module.ec2]
 }
+
+module "rds" {
+  source                       = "../../modules/rds"
+  project_name                 = var.project_name
+  environment                  = var.environment
+  vpc_id                       = module.vpc.vpc_id
+  subnet_ids                   = module.vpc.private_subnet_ids
+  security_group_id            = module.security_groups.rds_security_group_id
+  db_instance_class            = var.db_instance_class
+  db_engine                    = var.db_engine
+  db_engine_version            = var.db_engine_version
+  db_username                  = var.db_username
+  db_name                      = var.db_name
+  allocated_storage            = var.allocated_storage
+  master_username              = var.master_username
+  storage_type                 = var.storage_type
+  multi_az                     = var.multi_az
+  maintenance_window           = var.maintenance_window
+  auto_minor_version_upgrade   = var.auto_minor_version_upgrade
+  apply_immediately            = var.apply_immediately
+  deletion_protection          = var.deletion_protection
+  skip_final_snapshot          = var.skip_final_snapshot
+  backup_retention_period      = var.backup_retention_period
+  backup_window                = var.backup_window
+  performance_insights_enabled = var.performance_insights_enabled
+  monitoring_interval          = var.monitoring_interval
+
+  tags = local.common_tags
+
+  depends_on = [module.vpc, module.security_groups]
+}
