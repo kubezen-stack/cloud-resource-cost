@@ -1,0 +1,17 @@
+plugin: aws_ec2
+regions:
+  - us-east-1
+filters:
+  tag:Environment: dev
+  tag:Project: cost-optimizer-dev
+  instance-state-name: [running]
+keyed_groups:
+  - key: tags.Role
+    prefix: ""
+    separator: ""
+hostnames:
+  - public-ip-address
+  - network-interface.association.public-ip
+  - dns-name
+comspose:
+  ansible_host: public-ip-address

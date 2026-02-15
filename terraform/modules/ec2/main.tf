@@ -74,7 +74,7 @@ resource "aws_instance" "ec2_instance" {
     var.tags,
     {
       Name  = "${local.hostname-tag}-node-${count.index + 1}"
-      Role  = "Kubernetes-node"
+      Role  = count.index == 0 ? "master" : "worker"
       Index = "${count.index + 1}"
     }
   )

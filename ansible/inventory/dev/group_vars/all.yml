@@ -2,6 +2,9 @@ kubernetes_version: 1.27.3
 pod_network_cidr: 192.168.0.0/16
 environment: dev
 
+ansible_user: ubuntu
+ansible_ssh_private_key_file: ../../../ssh/cost-optimizer-dev-key.pem
+
 network_plugin: calico
 calico_ipip_mode: Never
 calico_vxlan_mode: Always
