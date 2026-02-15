@@ -80,11 +80,20 @@ module "security_groups" {
   depends_on = [module.vpc]
 }
 
+module "s3" {
+  source                 = "../../modules/s3"
+  project_name           = var.project_name
+  environment            = var.environment
+  tags                   = local.common_tags
+  reports_lifecycle_days = var.environment == "prod" ? 90 : 30
+  backups_lifecycle_days = var.environment == "prod" ? 90 : 14
+}
+
 module "iam" {
   source               = "../../modules/iam"
   project_name         = var.project_name
   environment          = var.environment
-  s3_bucket_arns       = []
+  s3_bucket_arns       = [module.s3.reports_bucket_arn, module.s3.backups_bucket_arn]
   enable_cloudwatch    = var.enable_cloudwatch
   enable_cost_explorer = var.enable_cost_explorer
   enable_vault_auth    = var.enable_vault_auth

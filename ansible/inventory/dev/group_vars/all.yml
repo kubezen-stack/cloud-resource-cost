@@ -1,0 +1,11 @@
+kubernetes_version: 1.27.3
+pod_network_cidr: 192.168.0.0/16
+environment: dev
+
+network_plugin: calico
+calico_ipip_mode: Never
+calico_vxlan_mode: Always
+calico_typha_enabled: false
+
+master_node: 1
+worker_node: 1

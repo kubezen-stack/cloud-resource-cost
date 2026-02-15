@@ -331,6 +331,21 @@ variable "s3_bucket_arns" {
 }
 
 # ==========================================
+# S3 SUPPORT
+# ==========================================
+variable "reports_lifecycle_days" {
+  description = "Days before reports are deleted"
+  type        = number
+  default     = 30
+}
+
+variable "backups_lifecycle_days" {
+  description = "Days before backups are deleted"
+  type        = number
+  default     = 14
+}
+
+# ==========================================
 # KUBERNETES SUPPORT (Optional)
 # ==========================================
 variable "enable_kubernetes" {
