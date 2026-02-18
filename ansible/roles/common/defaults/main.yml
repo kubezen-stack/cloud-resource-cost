@@ -1,3 +1,23 @@
-#SPDX-License-Identifier: MIT-0
----
-# defaults file for roles/common
+common_packages:
+  - apt-transport-https
+  - ca-certificates
+  - curl
+  - software-properties-common
+  - jq
+  - lsb-release
+  - net-tools
+  - git
+  - gnupg
+  - gpg
+  - vim
+  - unzip
+  - htop
+
+kernel_modules:
+  - br_netfilter
+  - overlay
+
+sysctl_params:
+  - { name: "net.bridge.bridge-nf-call-iptables", value: 1 }
+  - { name: "net.bridge.bridge-nf-call-ip6tables", value: 1 }
+  - { name: "net.ipv4.ip_forward", value: 1 }

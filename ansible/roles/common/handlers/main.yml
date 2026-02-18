@@ -1,3 +1,2 @@
-#SPDX-License-Identifier: MIT-0
----
-# handlers file for roles/common
+- name: reload sysctl
+  command: sysctl --system

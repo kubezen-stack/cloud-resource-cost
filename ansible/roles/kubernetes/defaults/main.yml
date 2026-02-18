@@ -1,3 +1,2 @@
-#SPDX-License-Identifier: MIT-0
----
-# defaults file for roles/kubernetes
+kubernetes_version: "1.28.0"
+containerd_version: "latest"

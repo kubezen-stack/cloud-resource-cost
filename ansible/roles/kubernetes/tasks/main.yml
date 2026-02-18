@@ -1,3 +1,119 @@
-#SPDX-License-Identifier: MIT-0
----
-# tasks file for roles/kubernetes
+- name: Add Docker gpg key
+  apt_key:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    state: present
+  tags: containerd
+
+- name: Add Docker repository
+  apt_repository:
+    repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable
+    state: present
+    update_cache: yes
+  tags: containerd
+
+- name: Install containerd
+  apt:
+    name: containerd.io
+    state: present
+  tags: containerd
+
+- name: Create containerd config directory
+  file:
+    path: /etc/containerd
+    state: directory
+  tags: containerd
+
+- name: Check if containerd config file exists
+  stat:
+    path: /etc/containerd/config.toml
+  register: containerd_config
+  tags: containerd
+
+- name: Generate default containerd config
+  shell: containerd config default > /etc/containerd/config.toml
+  args:
+    creates: /etc/containerd/config.toml
+  tags: containerd
+
+- name: Configuring Systemd cgroup driver for containerd
+  lineinfile:
+    path: /etc/containerd/config.toml
+    regexp: "SystemdCgroup = false"
+    line: "SystemdCgroup = true"
+  notify: restarted containerd
+  tags: containerd
+
+- name: Enable and start containerd
+  systemd:
+    name: containerd
+    state: started
+    enabled: yes
+  tags: containerd
+
+- name: Create directory for Kubernetes
+  file:
+    path: /etc/apt/keyrings
+    state: directory
+  tags: k8s_packages
+
+- name: Add Kubernetes GPG key
+  shell: |
+    curl -fsSL https://pkgs.k8s.io/core:/stable:/v{{ kubernetes_version }}/deb/Release.key | \
+    gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+  args:
+    creates: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+  tags: k8s_packages
+
+- name: Add Kubernetes repository
+  apt_repository:
+    repo: "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v{{ kubernetes_version }}/deb/ /"
+    state: present
+  tags: k8s_packages
+
+- name: Install kubeadm, kubelet and kubectl
+  apt:
+    name:
+      - kubeadm
+      - kubelet
+      - kubectl
+    state: present
+    notify: restarted kubelet
+    update_cache: yes
+  tags: k8s_packages
+
+- name: Hold kubeadm, kubelet and kubectl
+  apt:
+    name:
+      - kubeadm
+      - kubelet
+      - kubectl
+    state: hold
+  tags: k8s_packages
+
+- name: Enable and start kubelet
+  systemd:
+    name: kubelet
+    state: started
+    enabled: yes
+  tags: k8s_packages
+
+- name: Verify if kubelet is running
+  systemd:
+    name: kubelet
+    state: started
+  register: kubelet_status
+  tags: verify
+
+- name: Verify if containerd is running
+  systemd:
+    name: containerd
+    state: started
+  register: containerd_status
+  tags: verify
+
+- name: Summary of installation status
+  debug:
+    msg:
+      - "Kubelet {{kubelet_status.state.ActiveState}}"
+      - "Containerd {{containerd_status.state.ActiveState}}"
+  tags: verify

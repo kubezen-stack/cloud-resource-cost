@@ -1,0 +1,11 @@
+- name: "Common setup for all nodes"
+  import_playbook: common.yml
+
+- name: "Set up Kubernetes master"
+  import_playbook: master_k8s.yml
+
+- name: "Set up Kubernetes worker"
+  import_playbook: worker_k8s.yml
+
+- name: "Install Helm"
+  import_playbook: helm_group.yml

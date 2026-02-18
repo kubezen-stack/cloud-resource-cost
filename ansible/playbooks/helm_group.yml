@@ -1,0 +1,6 @@
+- name: "Install Helm on Kubernetes master node"
+  hosts: master
+  become: yes
+
+  roles:
+    - helm

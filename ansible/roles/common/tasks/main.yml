@@ -1,3 +1,60 @@
-#SPDX-License-Identifier: MIT-0
----
-# tasks file for roles/common
+- name: Update apt cache
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+  tags: packages
+
+- name: Update all packages to the latest version
+  apt:
+    upgrade: dist
+  tags: packages
+
+- name: Install common packages
+  apt:
+    name: "{{ common_packages }}"
+    state: present
+  tags: packages
+
+- name: Disable swap
+  command: swapoff -a
+  when: ansible_swaptotal_mb > 0
+  tags: swap
+
+- name: Disable swap in fstab
+  replace:
+    path: /etc/fstab
+    regexp: "^([^#].*swap.*)$"
+    replace: '# \1'
+  tags: swap
+
+- name: Load kernel modules
+  modprobe:
+    name: "{{ item }}"
+    state: present
+  loop: "{{ kernel_modules }}"
+  tags: kernel
+
+- name: Ensure kernel modules are loaded on boot
+  copy:
+    dest: /etc/modules-load.d/k8s.conf
+    content: |
+      {% for module in kernel_modules %}
+      {{ module }}
+      {% endfor %}
+  notify: reload sysctl
+  tags: kernel
+
+- name: Configure sysctl parameters
+  sysctl:
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+    state: present
+    sysctl_file: /etc/sysctl.d/k8s.conf
+  loop: "{{ sysctl_params }}"
+  notify: reload sysctl
+  tags: sysctl
+
+- name: UTC timezone
+  timezone:
+    name: UTC
+  tags: timezone

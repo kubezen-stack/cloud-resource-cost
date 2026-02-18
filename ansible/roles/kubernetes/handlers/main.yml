@@ -1,3 +1,9 @@
-#SPDX-License-Identifier: MIT-0
----
-# handlers file for roles/kubernetes
+- name: restarted containerd
+  systemd:
+    name: containerd
+    state: restarted
+
+- name: restarted kubelet
+  systemd:
+    name: kubelet
+    state: restarted

@@ -1,0 +1,6 @@
+- name: "Set up Kubernetes worker node"
+  hosts: worker
+  become: yes
+
+  roles:
+    - worker
