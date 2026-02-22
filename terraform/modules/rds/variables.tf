@@ -13,6 +13,12 @@ variable "environment" {
   }
 }
 
+variable "enable_rds" {
+  description = "Whether to create the RDS instance."
+  type        = bool
+  default     = true
+}
+
 variable "vpc_id" {
   description = "The ID of the VPC where the RDS instance will be deployed."
   type        = string

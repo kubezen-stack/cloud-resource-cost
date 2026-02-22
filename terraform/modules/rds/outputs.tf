@@ -3,6 +3,11 @@ output "db_insance_id" {
   value       = aws_db_instance.main.id
 }
 
+output "rds_enabled" {
+  description = "Whether RDS is enabled"
+  value       = var.enable_rds
+}
+
 output "db_endpoint" {
   description = "The connection endpoint for the RDS instance."
   value       = aws_db_instance.main.address

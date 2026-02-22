@@ -154,6 +154,12 @@ variable "public_subnet_ids" {
 # ==========================================
 # DATABASE (RDS)
 # ==========================================
+variable "enable_rds" {
+  description = "Whether to create the RDS instance"
+  type        = bool
+  default     = false
+}
+
 variable "db_engine" {
   description = "The database engine to use for the RDS instance."
   type        = string
