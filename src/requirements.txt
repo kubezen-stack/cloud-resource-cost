@@ -1,0 +1,7 @@
+fastapi
+jwt
+bcrypt
+sqlalchemy
+pydantic-settings
+psycopg2-binary
+alembic
