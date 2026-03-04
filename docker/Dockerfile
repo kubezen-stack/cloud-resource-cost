@@ -1,4 +1,4 @@
-FROM python:3.12-slim AS builder
+FROM python:3.11-slim AS builder
 
 WORKDIR /build
 
@@ -7,11 +7,11 @@ RUN apt-get update && apt-get install -y \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/* 
 
-COPY requirements.txt .
+COPY src/requirements.txt .
 
 RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
-FROM python:3.12-slim
+FROM python:3.11-slim
 
 WORKDIR /app
 
@@ -21,9 +21,9 @@ RUN apt-get update && apt-get install -y \
 
 COPY --from=builder /install /usr/local
 
-COPY app ./app \
-    alembic ./alembic \
-    alembic.ini ./
+COPY src/app/ ./app/
+COPY src/alembic/ ./alembic/
+COPY src/alembic.ini .
 
 EXPOSE 8000
 

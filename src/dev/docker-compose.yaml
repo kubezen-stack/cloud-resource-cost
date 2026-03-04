@@ -2,11 +2,11 @@ version: '3.8'
 
 services:
   postgres_db:
-    image: postgres:18-alpine
+    image: postgres:17-alpine
     container_name: postgress_container
     restart: always
     ports:
-      - 5432:5432
+      - 5433:5432
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -21,7 +21,7 @@ services:
 
   app:
     build:
-      context: .
+      context: ../..
       dockerfile: docker/Dockerfile
     container_name: cost-optimizer-dev-container
     env_file:
@@ -29,7 +29,7 @@ services:
     ports:
       - 8000:8000
     environment:
-      - POSTGRES_HOST=db
+      - POSTGRES_HOST=postgres_db
       - ENVIRONMENT=dev
     volumes:
       - ../app:/app/app

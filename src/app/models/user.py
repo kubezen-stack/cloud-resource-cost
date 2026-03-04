@@ -1,19 +1,17 @@
-from sqlalchemy import Boolean, Column, Integer, String, DateTime
+from sqlalchemy import Boolean, Column, String, DateTime
+from sqlalchemy.dialects.postgresql import UUID
 from app.core.database import Base
 import uuid
 from datetime import datetime
 
-def generate_uuid():
-    return str(uuid.uuid4())
-
 class User(Base):
     __tablename__ = "users"
 
-    id = Column(Integer, primary_key=True, default=generate_uuid)
+    id = Column(UUID(as_uuid=True), primary_key=True, index=True, default=uuid.uuid4)
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
     full_name = Column(String, nullable=True)
     is_active = Column(Boolean, default=True)
     is_superuser = Column(Boolean, default=False)
-    created_at = Column(DateTime, nullable=False, default=datetime.now())
-    updated_at = Column(DateTime, nullable=False, onupdate=datetime.now())
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=True, onupdate=datetime.utcnow)
