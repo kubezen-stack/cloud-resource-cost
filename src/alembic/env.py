@@ -3,6 +3,8 @@ from logging.config import fileConfig
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 from app.models.user import User
+from app.models.cost_service import CostService
+from app.models.aws_account import AWSaccount
 from app.core.database import Base
 from app.core.config import settings
 from alembic import context
