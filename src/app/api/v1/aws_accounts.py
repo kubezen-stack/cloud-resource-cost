@@ -1,8 +1,9 @@
 from typing import Annotated, List
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from grpc import Status
 import uuid as uuid_pkg
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.models.aws_account import AWSaccount
@@ -15,7 +16,7 @@ router = APIRouter()
 async def connect_aws_account(account_data: AWSCreateAccount, 
                               current_user: Annotated[User, Depends(get_current_user)],
                               db: Annotated[AsyncSession, Depends(get_db)]):
-    result = db.execute(
+    result = await db.execute(
         select(AWSaccount).where(AWSaccount.role_arn == account_data.role_arn)
     )
     existing_account = result.scalar_one_or_none()
@@ -43,7 +44,7 @@ async def connect_aws_account(account_data: AWSCreateAccount,
         
     return new_account
 
-@router.get('/', response_model=[AWSAccountResponse])
+@router.get('/', response_model=List[AWSAccountResponse])
 async def get_aws_accounts(current_user: Annotated[User, Depends(get_current_user)], db: Annotated[AsyncSession, Depends(get_db)]):
     result = await db.execute(
         select(AWSaccount).where(AWSaccount.user_id == current_user.id).order_by(AWSaccount.created_at.desc())

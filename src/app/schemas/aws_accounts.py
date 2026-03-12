@@ -9,8 +9,8 @@ class AWSAccountBase(BaseModel):
         str_strip_whitespace=True
     )
 
-    account_name: str = Field(..., min_length=3, max_length=50)
-    account_id: str = Field(..., min_length=12, max_length=12)
+    aws_account_name: str = Field(..., min_length=3, max_length=50)
+    aws_account_id: str = Field(..., min_length=12, max_length=12)
     role_arn: str = Field(..., pattern="^arn:aws:iam::[0-9]+:role/.+$")
 
 class AWSCreateAccount(AWSAccountBase):
