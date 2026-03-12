@@ -3,7 +3,7 @@ from fastapi import Depends, FastAPI
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.v1 import auth
+from app.api.v1 import auth, aws_accounts
 from app.core.config import settings
 
 @asynccontextmanager
@@ -20,6 +20,7 @@ app = FastAPI(
 )
 
 app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["Authentification"])
+app.include_router(aws_accounts.router, prefix=f"{settings.API_V1_STR}/aws_accounts", tags=["AWS Accounts"])
 
 app.add_middleware(
     CORSMiddleware,
