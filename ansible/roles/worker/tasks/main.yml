@@ -1,3 +1,52 @@
-#SPDX-License-Identifier: MIT-0
----
-# tasks file for roles/worker
+- name: Check is Worker Node is already joined to Cluster
+  stat:
+    path: /etc/kubernetes/kubelet.conf
+  register: kubelet_exists
+  tags: join
+
+- name: Wait for join command to be available
+  wait_for:
+    path: "{{ playbook_dir }}/join-command.sh"
+    timeout: 300
+    become: no
+    delegate_to: localhost
+    when: not kubelet_exists.stat.exists
+  tags: join
+
+- name: Copy join command to local file
+  local_action:
+    src: "{{ playbook_dir }}/join-command.sh"
+    dest: /tmp/join-command.sh
+    mode: 0755
+  when: not kubelet_exists.stat.exists
+  tags: join
+
+- name: Join Worker Node to Cluster
+  shell: /tmp/join-command.sh
+  when: not kubelet_exists.stat.exists
+  register: join
+  tags: join
+
+- name: Check if Worker Node joined to Cluster
+  debug:
+    var: join.stdout_lines
+  when: join is changed
+  tags: join
+
+- name: Delete join command
+  file:
+    path: /tmp/join-command.sh
+    state: absent
+  tags: cleanup
+
+- name: Wait for kubelet to be ready
+  systemd:
+    name: kubelet
+    state: started
+  tags: verify
+
+- name: Display worker nodes
+  debug:
+    msg: "Worker Nodes are successfully joined to Cluster"
+  shell: kubectl get nodes
+  tags: verify

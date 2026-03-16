@@ -4,6 +4,9 @@
 - name: "Set up Kubernetes master"
   import_playbook: master_k8s.yml
 
+- name: "Set up Calico CNI"
+  import_playbook: calico.yml
+
 - name: "Set up Kubernetes worker"
   import_playbook: worker_k8s.yml
 

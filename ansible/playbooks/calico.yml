@@ -1,0 +1,6 @@
+- name: "Set up Calico CNO"
+  hosts: master
+  become: yes
+
+  roles:
+    - calico

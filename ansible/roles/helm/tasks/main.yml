@@ -1,3 +1,73 @@
-#SPDX-License-Identifier: MIT-0
----
-# tasks file for roles/helm
+- name: Check if Helm is already installed
+  command: which helm
+  register: helm_exists
+  ignore_errors: true
+  changed_when: false
+  tags: install
+
+- name: Install Helm
+  get_url:
+    url: https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+    dest: /tmp/get_helm.sh
+    mode: 0700
+  when: helm_exists.rc != 0
+  tags: install
+
+- name: Delete installation script
+  file:
+    path: /tmp/get_helm.sh
+    state: absent
+  when: helm_exists.rc != 0
+  tags: cleanup
+
+- name: Verify Helm installation
+  command: helm version --short
+  register: helm_version
+  tags: verify
+
+- name: Display Helm version
+  debug:
+    msg: "Helm version: {{ helm_version.stdout }}"
+  tags: verify
+
+- name: Add Helm repositories
+  become: no
+  command: helm repo add {{ item.name }} {{ item.url }}
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
+  register: repo_add_result
+  failed_when:
+    - repo_add_result.rc != 0
+    - "'already exists' not in repo_add_result.stderr"
+  changed_when: "'already exists' not in repo_add_result.stderr"
+  loop:
+    - { name: "bitnami", url: "https://charts.bitnami.com/bitnami" }
+    - { name: "jetstack", url: "https://charts.jetstack.io" }
+    - {
+        name: "ingress-nginx",
+        url: "https://kubernetes.github.io/ingress-nginx",
+      }
+  tags: repos
+
+- name: Update Helm repositories
+  become: no
+  command: helm repo update
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
+  changed_when: false
+  tags: repos
+
+- name: Verify Helm can communicate with Kubernetes
+  become: no
+  command: helm list -A
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
+  register: helm_list
+  changed_when: false
+  tags: verify
+
+- name: Display Helm test connection
+  debug:
+    msg: "Helm successfully configured and connected to Kubernetes"
+  when: helm_list.rc == 0
+  tags: verify
