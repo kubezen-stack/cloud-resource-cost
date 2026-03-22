@@ -4,17 +4,17 @@
   register: kubelet_exists
   tags: join
 
-- name: Wait for join command to be available
+- name: Wait for join command file to be created
+  become: no
   wait_for:
     path: "{{ playbook_dir }}/join-command.sh"
     timeout: 300
-    become: no
-    delegate_to: localhost
-    when: not kubelet_exists.stat.exists
+  delegate_to: localhost
+  when: not kubelet_exists.stat.exists
   tags: join
 
 - name: Copy join command to local file
-  local_action:
+  copy:
     src: "{{ playbook_dir }}/join-command.sh"
     dest: /tmp/join-command.sh
     mode: 0755
@@ -45,8 +45,23 @@
     state: started
   tags: verify
 
-- name: Display worker nodes
+- name: Display worker node success message
   debug:
-    msg: "Worker Nodes are successfully joined to Cluster"
+    msg: "Worker node successfully joined the cluster"
+  when: join is changed
+  tags: verify
+
+- name: Get cluster nodes status
+  become: no
   shell: kubectl get nodes
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
+  delegate_to: "{{ groups['master'][0] }}"
+  register: cluster_nodes
+  changed_when: false
+  tags: verify
+
+- name: Show all cluster nodes
+  debug:
+    var: cluster_nodes.stdout_lines
   tags: verify

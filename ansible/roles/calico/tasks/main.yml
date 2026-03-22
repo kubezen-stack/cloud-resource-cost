@@ -1,18 +1,25 @@
-- name: Wait for Calisco API to be available
+- name: Wait for Calico API to be available
   become: no
   command: kubectl get crd felixconfigurations.crd.projectcalico.org
   environment:
     KUBECONFIG: /home/ubuntu/.kube/config
-  register: calico_ready
-  until: calico_ready.rc == 0
+  register: calico_crd_check
+  until: calico_crd_check.rc == 0
   delay: 10
-  retries: 20
+  retries: 30
+  changed_when: false
   tags: wait
 
-- name: Create Calico FelixVXLAN configuration
+- name: Display CRD check result
+  debug:
+    msg: "Calico CRD is available"
+  when: calico_crd_check.rc == 0
+  tags: wait
+
+- name: Create Calico FelixConfiguration
   become: no
-  shell: >
-    kubectl apply -f - <<EOF
+  shell: |
+    cat <<EOF | kubectl apply -f -
     apiVersion: projectcalico.org/v3
     kind: FelixConfiguration
     metadata:
@@ -21,21 +28,27 @@
       vxlanEnabled: true
       ipipEnabled: false
       vxlanVNI: 4096
+      iptablesBackend: NFT
     EOF
   environment:
     KUBECONFIG: /home/ubuntu/.kube/config
-  register: calico_ready
-  changed_when: "'created' in calico_ready.stdout or 'configured' in calico_ready.stdout"
+  register: felix_config_result
+  changed_when: "'created' in felix_config_result.stdout or 'configured' in felix_config_result.stdout"
+  tags: configure
+
+- name: Display FelixConfiguration result
+  debug:
+    var: felix_config_result.stdout_lines
   tags: configure
 
 - name: Create Calico IPPool configuration
   become: no
-  shell: >
-    kubectl apply -f - <<EOF
+  shell: |
+    cat <<EOF | kubectl apply -f -
     apiVersion: projectcalico.org/v3
     kind: IPPool
     metadata:
-      name: default
+      name: default-ipv4-ippool
     spec:
       cidr: {{ pod_network_cidr }}
       natOutgoing: true
@@ -45,40 +58,79 @@
     EOF
   environment:
     KUBECONFIG: /home/ubuntu/.kube/config
-  register: ippool_ready
-  changed_when: "'created' in ippool_ready.stdout or 'configured' in ippool_ready.stdout"
+  register: ippool_result
+  changed_when: "'created' in ippool_result.stdout or 'configured' in ippool_result.stdout"
   tags: configure
 
-- name: Verify Calico configuration
+- name: Display IPPool result
+  debug:
+    var: ippool_result.stdout_lines
+  tags: configure
+
+- name: Verify Calico FelixConfiguration
   become: no
   command: kubectl get felixconfiguration default -o yaml
   environment:
     KUBECONFIG: /home/ubuntu/.kube/config
-  register: felix_ready
+  register: felix_verify
   changed_when: false
+  tags: verify
+
+- name: Display FelixConfiguration
+  debug:
+    msg: "{{ felix_verify.stdout_lines }}"
+  tags: verify
+
+- name: Verify Calico IPPool
+  become: no
+  command: kubectl get ippool -o wide
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
+  register: ippool_verify
+  changed_when: false
+  tags: verify
+
+- name: Display IPPool
+  debug:
+    msg: "{{ ippool_verify.stdout_lines }}"
   tags: verify
 
 - name: Wait for Calico pods to be ready
   become: no
-  command: kubectl get pods -n kube-system -l k8s-app=calico-node --timeout=300s
+  shell: kubectl get pods -n kube-system -l k8s-app=calico-node --no-headers | grep -c "Running" || echo "0"
   environment:
     KUBECONFIG: /home/ubuntu/.kube/config
-  register: calico_ready
-  until: calico_ready.stdout|int > 0
+  register: calico_pods_running
+  until: calico_pods_running.stdout|int >= 1
   delay: 10
-  retries: 3
+  retries: 30
+  changed_when: false
   tags: verify
 
-- name: Get Calico pods
+- name: Get Calico pods status
   become: no
-  command: kubectl get pods -n kube-system -l k8s-app=calico-node --no-headers
+  command: kubectl get pods -n kube-system -l k8s-app=calico-node -o wide
   environment:
     KUBECONFIG: /home/ubuntu/.kube/config
-  register: calico_pods
+  register: calico_pods_status
   changed_when: false
   tags: verify
 
 - name: Display Calico pods
   debug:
-    var: calico_pods.stdout_lines
+    var: calico_pods_status.stdout_lines
+  tags: verify
+
+- name: Verify Calico node status
+  become: no
+  command: kubectl get nodes -o wide
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
+  register: nodes_status
+  changed_when: false
+  tags: verify
+
+- name: Display nodes status
+  debug:
+    msg: "{{ nodes_status.stdout_lines }}"
   tags: verify

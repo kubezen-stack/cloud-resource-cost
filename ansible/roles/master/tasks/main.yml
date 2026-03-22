@@ -1,89 +1,237 @@
-- name: "Check if Kubernetes is already installed"
+---
+- name: Check if Kubernetes cluster already initialized
   stat:
     path: /etc/kubernetes/admin.conf
   register: kubectl_exists
-  ignore_errors: true
   tags: init
 
 - name: Initialize Kubernetes Cluster
   command: >
     kubeadm init 
     --pod-network-cidr={{ pod_network_cidr }} 
-    --api-server-advertise-address={{ ansible_default_ipv4.address }}
+    --apiserver-advertise-address={{ ansible_facts['default_ipv4']['address'] }}
     --cri-socket=unix:///run/containerd/containerd.sock
   when: not kubectl_exists.stat.exists
   register: kubeadm_init
   tags: init
 
-- name: Create .kube directory for user ubuntu
+- name: Display kubeadm init output
+  debug:
+    var: kubeadm_init.stdout_lines
+  when: kubeadm_init is changed
+  tags: init
+
+- name: Create .kube directory for ubuntu user
   file:
     path: /home/ubuntu/.kube
     state: directory
     owner: ubuntu
     group: ubuntu
-    mode: 0755
+    mode: "0755"
   tags: config
 
-- name: Copy kubeconfig file to user ubuntu
+- name: Copy admin.conf to ubuntu user's kube config
   copy:
     src: /etc/kubernetes/admin.conf
     dest: /home/ubuntu/.kube/config
     owner: ubuntu
     group: ubuntu
-    mode: 0644
-    remote_src: true
+    mode: "0644"
+    remote_src: yes
   tags: config
 
+- name: Create .kube directory for root user
+  file:
+    path: /root/.kube
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  tags: config
+
+- name: Copy admin.conf to root user's kube config
+  copy:
+    src: /etc/kubernetes/admin.conf
+    dest: /root/.kube/config
+    owner: root
+    group: root
+    mode: "0644"
+    remote_src: yes
+  tags: config
+
+- name: Wait for API server to be ready
+  wait_for:
+    host: "{{ ansible_facts['default_ipv4']['address'] }}"
+    port: 6443
+    delay: 10
+    timeout: 300
+  tags: init
+
+- name: Wait for all control-plane pods to be created
+  shell: kubectl get pods -n kube-system --no-headers | wc -l
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  register: control_plane_pods
+  until: control_plane_pods.stdout|int >= 4
+  delay: 10
+  retries: 20
+  changed_when: false
+  tags: init
+
+- name: Display control plane pods
+  command: kubectl get pods -n kube-system
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  register: pods_status
+  changed_when: false
+  tags: init
+
+- name: Show control plane pods
+  debug:
+    var: pods_status.stdout_lines
+  tags: init
+
 - name: Install Calico network plugin
+  become: no
   command: >
     kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.26.1/manifests/calico.yaml
   environment:
-    - KUBECONFIG=/home/ubuntu/.kube/config
-  register: calico
-  changed_when: "'created' in calico.stdout_lines or 'updated' in calico.stdout_lines"
+    KUBECONFIG: /home/ubuntu/.kube/config
+  register: calico_install
+  changed_when: "'created' in calico_install.stdout or 'configured' in calico_install.stdout"
   tags: cni
 
-- name: Wait for Calico to be ready
+- name: Display Calico install output
+  debug:
+    var: calico_install.stdout_lines
+  tags: cni
+
+- name: Wait for Calico daemonset to exist
   become: no
-  command: >
-    kubectl get pods -n kube-system -l k8s-app=calico-node --no-headers || grep -c "Running" || true
+  command: kubectl get daemonset -n kube-system calico-node
   environment:
     KUBECONFIG: /home/ubuntu/.kube/config
-  register: calico_ready
-  until: calico_ready.stdout|int > 0
-  delay: 10
-  retries: 20
-  when: network_plugin == 'calico'
+  register: calico_ds_check
+  until: calico_ds_check.rc == 0
+  delay: 5
+  retries: 12
+  changed_when: false
   tags: cni
 
-- name: Get token to join worker nodes
-  command: kubeadm token create --print-join-command
+- name: Wait for kube-proxy to be created (comes with Calico)
+  become: no
+  command: kubectl get daemonset -n kube-system kube-proxy
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
+  register: kube_proxy_check
+  until: kube_proxy_check.rc == 0
+  delay: 5
+  retries: 20
+  changed_when: false
+  ignore_errors: yes
+  tags: cni
+
+- name: Check if kube-proxy needs manual installation
+  debug:
+    msg: "kube-proxy not found in Calico manifest, will install manually"
+  when: kube_proxy_check.rc != 0
+  tags: cni
+
+- name: Install kube-proxy manually if not present
+  command: >
+    kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.26.1/manifests/kube-proxy.yaml
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
+  when: kube_proxy_check.rc != 0
+  register: kube_proxy_manual
+  ignore_errors: yes
+  tags: cni
+
+- name: Wait for Calico pods to be ready
+  become: no
+  shell: kubectl get pods -n kube-system -l k8s-app=calico-node --no-headers | grep -c "Running" || echo "0"
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
+  register: calico_pods_running
+  until: calico_pods_running.stdout|int >= 1
+  delay: 10
+  retries: 20
+  changed_when: false
+  tags: cni
+
+- name: Get Calico pods status
+  become: no
+  command: kubectl get pods -n kube-system -l k8s-app=calico-node -o wide
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
+  register: calico_pods_status
+  changed_when: false
+  tags: cni
+
+- name: Display Calico pods
+  debug:
+    var: calico_pods_status.stdout_lines
+  tags: cni
+
+- name: Get kube-proxy status
+  become: no
+  command: kubectl get pods -n kube-system -l k8s-app=kube-proxy -o wide
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
+  register: kube_proxy_status
+  changed_when: false
+  ignore_errors: yes
+  tags: cni
+
+- name: Display kube-proxy pods
+  debug:
+    var: kube_proxy_status.stdout_lines
+  when: kube_proxy_status.rc == 0
+  tags: cni
+
+- name: Generate join command
+  shell: kubeadm token create --print-join-command
   register: join_command
   tags: join
 
-- name: Copy join command to local file
-  become: no
-  local_action:
-    module: copy
-    content: "{{ join_command.stdout }}"
-    dest: "{{ playbook_dir }}/join-command.sh"
+- name: Display join command
+  debug:
+    var: join_command.stdout_lines
   tags: join
 
-- name: Show cluster is initialized
-  debug:
-    msg: "Cluster is initialized"
-  when: kubeadm_init.changed
-  tags: init
+- name: Save join command to local file
+  copy:
+    content: "{{ join_command.stdout }}"
+    dest: "{{ playbook_dir }}/join-command.sh"
+    mode: "0644"
+  delegate_to: localhost
+  become: no
+  tags: join
 
 - name: Display cluster nodes status
   become: no
-  command: kubectl get nodes
+  command: kubectl get nodes -o wide
   environment:
     KUBECONFIG: /home/ubuntu/.kube/config
   register: nodes
+  changed_when: false
   tags: verify
 
 - name: Show cluster nodes
   debug:
-    msg: "{{ nodes.stdout_lines }}"
+    var: nodes.stdout_lines
+  tags: verify
+
+- name: Display all pods in kube-system
+  become: no
+  command: kubectl get pods -n kube-system -o wide
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
+  register: all_pods
+  changed_when: false
+  tags: verify
+
+- name: Show all kube-system pods
+  debug:
+    var: all_pods.stdout_lines
   tags: verify
