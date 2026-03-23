@@ -1,26 +1,13 @@
-- name: Wait for Calico API to be available
-  become: no
-  command: kubectl get crd felixconfigurations.crd.projectcalico.org
-  environment:
-    KUBECONFIG: /home/ubuntu/.kube/config
-  register: calico_crd_check
-  until: calico_crd_check.rc == 0
-  delay: 10
-  retries: 30
-  changed_when: false
-  tags: wait
-
-- name: Display CRD check result
+- name: Display CRD readiness status
   debug:
-    msg: "Calico CRD is available"
-  when: calico_crd_check.rc == 0
+    msg: "Calico CRD is established and ready for use"
   tags: wait
 
 - name: Create Calico FelixConfiguration
   become: no
   shell: |
     cat <<EOF | kubectl apply -f -
-    apiVersion: projectcalico.org/v3
+    apiVersion: crd.projectcalico.org/v1
     kind: FelixConfiguration
     metadata:
       name: default
@@ -33,6 +20,9 @@
   environment:
     KUBECONFIG: /home/ubuntu/.kube/config
   register: felix_config_result
+  until: felix_config_result.rc == 0
+  delay: 15
+  retries: 5
   changed_when: "'created' in felix_config_result.stdout or 'configured' in felix_config_result.stdout"
   tags: configure
 
@@ -41,11 +31,24 @@
     var: felix_config_result.stdout_lines
   tags: configure
 
+- name: Wait for IPPool CRD to be established
+  become: no
+  shell: |
+    kubectl get crd ippools.crd.projectcalico.org -o jsonpath='{.status.conditions[?(@.type=="Established")].status}'
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
+  register: ippool_crd_ready
+  until: ippool_crd_ready.stdout == "True"
+  delay: 5
+  retries: 30
+  changed_when: false
+  tags: configure
+
 - name: Create Calico IPPool configuration
   become: no
   shell: |
     cat <<EOF | kubectl apply -f -
-    apiVersion: projectcalico.org/v3
+    apiVersion: crd.projectcalico.org/v1
     kind: IPPool
     metadata:
       name: default-ipv4-ippool
@@ -59,6 +62,9 @@
   environment:
     KUBECONFIG: /home/ubuntu/.kube/config
   register: ippool_result
+  until: ippool_result.rc == 0
+  delay: 10
+  retries: 10
   changed_when: "'created' in ippool_result.stdout or 'configured' in ippool_result.stdout"
   tags: configure
 

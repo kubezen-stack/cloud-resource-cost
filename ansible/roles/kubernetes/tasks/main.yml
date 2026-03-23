@@ -24,18 +24,26 @@
     mode: "0755"
   tags: containerd
 
-- name: Generate default containerd config
-  shell: containerd config default > /etc/containerd/config.toml
-  args:
-    creates: /etc/containerd/config.toml
+- name: Remove old containerd config if exists
+  file:
+    path: /etc/containerd/config.toml
+    state: absent
   tags: containerd
 
-- name: Enable SystemdCgroup in containerd
-  lineinfile:
-    path: /etc/containerd/config.toml
-    regexp: '^\s+SystemdCgroup\s*=\s*false'
-    line: "            SystemdCgroup = true"
+- name: Generate default containerd config
+  shell: containerd config default > /etc/containerd/config.toml
+  tags: containerd
+
+- name: Enable SystemdCgroup in containerd (sed method)
+  shell: sed -i 's/SystemdCgroup = false/SystemdCgroup = true/g' /etc/containerd/config.toml
   notify: restarted containerd
+  tags: containerd
+
+- name: Verify the change was applied
+  shell: grep -c "SystemdCgroup = true" /etc/containerd/config.toml
+  register: systemd_cgroup_count
+  changed_when: false
+  failed_when: systemd_cgroup_count.stdout == "0"
   tags: containerd
 
 - name: Remove disabled_plugins cri from containerd config
@@ -46,11 +54,7 @@
   notify: restarted containerd
   tags: containerd
 
-- name: Ensure containerd is restarted if config changed
-  meta: flush_handlers
-  tags: containerd
-
-- name: Enable and start containerd
+- name: Enable and start containerd (without restart yet)
   systemd:
     name: containerd
     state: started
@@ -58,16 +62,23 @@
     daemon_reload: yes
   tags: containerd
 
-- name: Wait for containerd to be fully ready
-  wait_for:
-    timeout: 10
-  tags: containerd
-
 - name: Verify containerd is running
   command: systemctl is-active containerd
   register: containerd_check
   changed_when: false
   failed_when: containerd_check.stdout != "active"
+  tags: containerd
+
+- name: Enable SystemdCgroup in containerd
+  shell: sed -i 's/SystemdCgroup = false/SystemdCgroup = true/g' /etc/containerd/config.toml
+  notify: restarted containerd
+  tags: containerd
+
+- name: Verify the change was applied
+  shell: grep -c "SystemdCgroup = true" /etc/containerd/config.toml
+  register: systemd_cgroup_count
+  changed_when: false
+  failed_when: systemd_cgroup_count.stdout == "0"
   tags: containerd
 
 - name: Create directory for Kubernetes
@@ -119,6 +130,17 @@
     enabled: yes
     daemon_reload: yes
   tags: k8s_packages
+
+- name: Flush all handlers to restart services
+  meta: flush_handlers
+  tags: verify
+
+- name: Wait for services to stabilize
+  wait_for:
+    timeout: 10
+  delegate_to: localhost
+  become: no
+  tags: verify
 
 - name: Verify containerd is running (final check)
   systemd:

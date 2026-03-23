@@ -1,4 +1,3 @@
----
 - name: Check if Kubernetes cluster already initialized
   stat:
     path: /etc/kubernetes/admin.conf
@@ -36,25 +35,6 @@
     dest: /home/ubuntu/.kube/config
     owner: ubuntu
     group: ubuntu
-    mode: "0644"
-    remote_src: yes
-  tags: config
-
-- name: Create .kube directory for root user
-  file:
-    path: /root/.kube
-    state: directory
-    owner: root
-    group: root
-    mode: "0755"
-  tags: config
-
-- name: Copy admin.conf to root user's kube config
-  copy:
-    src: /etc/kubernetes/admin.conf
-    dest: /root/.kube/config
-    owner: root
-    group: root
     mode: "0644"
     remote_src: yes
   tags: config
@@ -118,33 +98,86 @@
   changed_when: false
   tags: cni
 
-- name: Wait for kube-proxy to be created (comes with Calico)
+- name: Check if kube-proxy exists
   become: no
   command: kubectl get daemonset -n kube-system kube-proxy
   environment:
     KUBECONFIG: /home/ubuntu/.kube/config
   register: kube_proxy_check
-  until: kube_proxy_check.rc == 0
-  delay: 5
-  retries: 20
-  changed_when: false
   ignore_errors: yes
+  changed_when: false
   tags: cni
 
-- name: Check if kube-proxy needs manual installation
+- name: Display kube-proxy check result
   debug:
-    msg: "kube-proxy not found in Calico manifest, will install manually"
+    msg: "kube-proxy {{ 'exists' if kube_proxy_check.rc == 0 else 'not found - will install' }}"
+  tags: cni
+
+- name: Copy kube-proxy manifest to master
+  template:
+    src: kube-proxy.yaml.j2
+    dest: /tmp/kube-proxy.yaml
+    mode: "0644"
   when: kube_proxy_check.rc != 0
   tags: cni
 
-- name: Install kube-proxy manually if not present
-  command: >
-    kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.26.1/manifests/kube-proxy.yaml
+- name: Install kube-proxy
+  become: no
+  command: kubectl apply -f /tmp/kube-proxy.yaml
   environment:
     KUBECONFIG: /home/ubuntu/.kube/config
   when: kube_proxy_check.rc != 0
-  register: kube_proxy_manual
-  ignore_errors: yes
+  register: kube_proxy_install
+  tags: cni
+
+- name: Display kube-proxy install output
+  debug:
+    var: kube_proxy_install.stdout_lines
+  when: kube_proxy_check.rc != 0 and kube_proxy_install is defined
+  tags: cni
+
+- name: Remove kube-proxy manifest
+  file:
+    path: /tmp/kube-proxy.yaml
+    state: absent
+  tags: cni
+
+- name: Wait for kube-proxy daemonset to be created
+  become: no
+  command: kubectl get daemonset -n kube-system kube-proxy
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
+  register: kube_proxy_ds
+  until: kube_proxy_ds.rc == 0
+  delay: 5
+  retries: 12
+  changed_when: false
+  tags: cni
+
+- name: Wait for kube-proxy pods to be ready
+  become: no
+  shell: kubectl get pods -n kube-system -l k8s-app=kube-proxy --no-headers | grep -c "Running" || echo "0"
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
+  register: kube_proxy_ready
+  until: kube_proxy_ready.stdout|int >= 1
+  delay: 10
+  retries: 20
+  changed_when: false
+  tags: cni
+
+- name: Get kube-proxy status
+  become: no
+  command: kubectl get pods -n kube-system -l k8s-app=kube-proxy -o wide
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
+  register: kube_proxy_status
+  changed_when: false
+  tags: cni
+
+- name: Display kube-proxy pods
+  debug:
+    var: kube_proxy_status.stdout_lines
   tags: cni
 
 - name: Wait for Calico pods to be ready
@@ -173,25 +206,23 @@
     var: calico_pods_status.stdout_lines
   tags: cni
 
-- name: Get kube-proxy status
-  become: no
-  command: kubectl get pods -n kube-system -l k8s-app=kube-proxy -o wide
+- name: Wait for API server to be fully ready
+  command: kubectl get nodes
   environment:
     KUBECONFIG: /home/ubuntu/.kube/config
-  register: kube_proxy_status
+  register: nodes_check
+  until: nodes_check.rc == 0
+  delay: 5
+  retries: 30
   changed_when: false
-  ignore_errors: yes
-  tags: cni
+  tags: join
 
-- name: Display kube-proxy pods
-  debug:
-    var: kube_proxy_status.stdout_lines
-  when: kube_proxy_status.rc == 0
-  tags: cni
-
-- name: Generate join command
+- name: Generate join command with retries
   shell: kubeadm token create --print-join-command
   register: join_command
+  until: join_command.rc == 0
+  delay: 10
+  retries: 10
   tags: join
 
 - name: Display join command
