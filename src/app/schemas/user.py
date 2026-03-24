@@ -16,6 +16,11 @@ class UserBase(BaseSchema):
 class UserCreate(UserBase):
     password: str = Field(..., min_length=8, max_length=72)
 
+class UserUpdate(BaseSchema):
+    email: Optional[EmailStr] = None
+    full_name: Optional[str] = None
+    password: Optional[str] = Field(None, min_length=8, max_length=72)
+
 class UserLogin(BaseSchema):
     email: EmailStr
     password: str

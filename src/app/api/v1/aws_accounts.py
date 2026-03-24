@@ -1,6 +1,5 @@
 from typing import Annotated, List
 from fastapi import APIRouter, Depends, HTTPException, status
-from grpc import Status
 import uuid as uuid_pkg
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,7 +11,7 @@ from app.schemas.aws_accounts import AWSAccountResponse, AWSCreateAccount
 
 router = APIRouter()
 
-@router.post("/", response_model=AWSAccountResponse, status_code=Status.HTTP_201_CREATED)
+@router.post("/", response_model=AWSAccountResponse, status_code=status.HTTP_201_CREATED)
 async def connect_aws_account(account_data: AWSCreateAccount, 
                               current_user: Annotated[User, Depends(get_current_user)],
                               db: Annotated[AsyncSession, Depends(get_db)]):
@@ -22,7 +21,7 @@ async def connect_aws_account(account_data: AWSCreateAccount,
     existing_account = result.scalar_one_or_none()
 
     if existing_account:
-        raise HTTPException(status_code=Status.HTTP_400_BAD_REQUEST, detail="Account already connected")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Account already connected")
     
     external_id=f"cost-opt-{str(uuid_pkg.uuid4())[:16]}"
 
@@ -59,5 +58,5 @@ async def get_aws_account(account_id: uuid_pkg.UUID, current_user: Annotated[Use
     )
     account = result.scalar_one_or_none()
     if not account:
-        raise HTTPException(status_code=Status.HTTP_404_NOT_FOUND, detail="Account not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
     return account
