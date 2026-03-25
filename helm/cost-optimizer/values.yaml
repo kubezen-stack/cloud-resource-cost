@@ -1,0 +1,72 @@
+replicaCount: 1
+
+image:
+  repository: cost-optimizer
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8000
+
+ingress:
+  enabled: false
+  className: nginx
+  hosts:
+    - host: cost-optimizer.local
+      paths:
+        - path: /
+          pathType: Prefix
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 250m
+    memory: 256Mi
+
+app:
+  name: cost-optimizer
+  environment: prod
+  debug: false
+  version: "1.0.0"
+  logLevel: INFO
+  secretKey: "change-me-in-production"
+  algorithm: "HS256"
+  accessTokenExpireMinutes: 10080
+  corsOrigins:
+    - "http://localhost:3000"
+
+database:
+  host: postgres-service
+  port: 5432
+  name: cost_optimizer
+  user: dbadmin
+  passwordSecretName: cost-optimizer-secrets
+  passwordSecretKey: database-password
+
+postgresql:
+  enabled: true
+  auth:
+    username: dbadmin
+    database: cost_optimizer
+    existingSecret: cost-optimizer-secrets
+    secretKeys:
+      adminPasswordKey: postgres-password
+      userPasswordKey: database-password
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8000
+  initialDelaySeconds: 30
+  periodSeconds: 10
+
+readinessProbe:
+  httpGet:
+    path: /ready
+    port: 8000
+  initialDelaySeconds: 10
+  periodSeconds: 5

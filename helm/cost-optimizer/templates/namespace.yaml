@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: { { .Release.Namespace } }
+  labels:
+    {{ - include "cost-optimizer.labels" . }}
+    name: { { .Release.Namespace } }
