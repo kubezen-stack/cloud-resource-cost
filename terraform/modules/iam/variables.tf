@@ -21,9 +21,21 @@ variable "enable_cloudwatch" {
 }
 
 variable "enable_vault_auth" {
-  description = "Enable permissions for EC2 instances to access AWS Systems Manager Parameter Store for secure value retrieval"
+  description = "Enable permissions for EC2 instances to access AWS Systems Manager Parameter Store"
   type        = bool
   default     = true
+}
+
+variable "enable_ecr" {
+  description = "Enable ECR permissions for EC2 instances to pull images"
+  type        = bool
+  default     = false
+}
+
+variable "ecr_repository_arns" {
+  description = "List of ECR repository ARNs to grant pull access. If empty, grants access to all repositories"
+  type        = list(string)
+  default     = []
 }
 
 variable "s3_bucket_arns" {

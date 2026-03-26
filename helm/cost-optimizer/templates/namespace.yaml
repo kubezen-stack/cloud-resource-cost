@@ -4,4 +4,4 @@ metadata:
   name: { { .Release.Namespace } }
   labels:
     {{ - include "cost-optimizer.labels" . }}
-    name: { { .Release.Namespace } }
+    name: {{ .Release.Namespace }}

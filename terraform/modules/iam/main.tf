@@ -47,7 +47,7 @@ resource "aws_iam_policy" "ec2_policy" {
                         "s3:PutObject",
                         "s3:DeleteObject"
                     ]
-                    Resource = concat(var.s3_bucket_arns, 
+                    Resource = concat(var.s3_bucket_arns,
                         [for arn in var.s3_bucket_arns : "${arn}/*"]
                     )
                 }
@@ -170,7 +170,7 @@ resource "aws_iam_policy" "cost_explorer_policy" {
 resource "aws_iam_policy" "vault_hashicorp_policy" {
     count = var.enable_vault_auth ? 1 : 0
     name = "${local.hostname-tag}-vault-hashicorp-policy"
-    description = "Policy for EC2 instances to access AWS Systems Manager Parameter Store for secure value retrieval"
+    description = "Policy for EC2 instances to access AWS Systems Manager Parameter Store"
 
     policy = jsonencode({
         Version = "2012-10-17"
@@ -189,34 +189,78 @@ resource "aws_iam_policy" "vault_hashicorp_policy" {
     })
 
     tags = merge(
-        local.common_tags, 
+        local.common_tags,
         {
             Name = "${local.hostname-tag}-vault-hashicorp-policy-${var.environment}"
         }
     )
 }
 
+resource "aws_iam_policy" "ecr_policy" {
+    count = var.enable_ecr ? 1 : 0
+    name  = "${local.hostname-tag}-ecr-policy"
+    description = "Policy for EC2 instances to pull images from ECR"
+
+    policy = jsonencode({
+        Version = "2012-10-17"
+        Statement = [
+            {
+                Effect = "Allow"
+                Action = [
+                    "ecr:GetAuthorizationToken"
+                ]
+                Resource = "*"
+            },
+            {
+                Effect = "Allow"
+                Action = [
+                    "ecr:GetDownloadUrlForLayer",
+                    "ecr:BatchGetImage",
+                    "ecr:BatchCheckLayerAvailability",
+                    "ecr:DescribeRepositories",
+                    "ecr:ListImages",
+                    "ecr:DescribeImages"
+                ]
+                Resource = length(var.ecr_repository_arns) > 0 ? var.ecr_repository_arns : ["*"]
+            }
+        ]
+    })
+
+    tags = merge(
+        local.common_tags,
+        {
+            Name = "${local.hostname-tag}-ecr-policy-${var.environment}"
+        }
+    )
+}
+
 resource "aws_iam_role_policy_attachment" "ec2_role_policy_attachment" {
-    role = aws_iam_role.ec2_role.name
+    role       = aws_iam_role.ec2_role.name
     policy_arn = aws_iam_policy.ec2_policy.arn
 }
 
 resource "aws_iam_role_policy_attachment" "cloudwatch_policy_attachment" {
-    count = var.enable_cloudwatch ? 1 : 0
-    role = aws_iam_role.ec2_role.name
+    count      = var.enable_cloudwatch ? 1 : 0
+    role       = aws_iam_role.ec2_role.name
     policy_arn = aws_iam_policy.cloudwatch_policy[0].arn
 }
 
 resource "aws_iam_role_policy_attachment" "cost_explorer_policy_attachment" {
-    count = var.enable_cost_explorer ? 1 : 0
-    role = aws_iam_role.ec2_role.name
+    count      = var.enable_cost_explorer ? 1 : 0
+    role       = aws_iam_role.ec2_role.name
     policy_arn = aws_iam_policy.cost_explorer_policy[0].arn
 }
 
 resource "aws_iam_role_policy_attachment" "vault_hashicorp_policy_attachment" {
-    count = var.enable_vault_auth ? 1 : 0
-    role = aws_iam_role.ec2_role.name
+    count      = var.enable_vault_auth ? 1 : 0
+    role       = aws_iam_role.ec2_role.name
     policy_arn = aws_iam_policy.vault_hashicorp_policy[0].arn
+}
+
+resource "aws_iam_role_policy_attachment" "ecr_policy_attachment" {
+    count      = var.enable_ecr ? 1 : 0
+    role       = aws_iam_role.ec2_role.name
+    policy_arn = aws_iam_policy.ecr_policy[0].arn
 }
 
 resource "aws_iam_instance_profile" "ec2_instance_profile" {

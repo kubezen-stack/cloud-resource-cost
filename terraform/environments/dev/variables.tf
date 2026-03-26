@@ -152,6 +152,15 @@ variable "public_subnet_ids" {
 }
 
 # ==========================================
+# ECR
+# ==========================================
+variable "ecr_max_image_count" {
+  description = "Maximum number of images to keep in ECR repository"
+  type        = number
+  default     = 10
+}
+
+# ==========================================
 # DATABASE (RDS)
 # ==========================================
 variable "enable_rds" {
@@ -202,26 +211,8 @@ variable "allocated_storage" {
   default     = 20
 }
 
-variable "max_allocated_storage" {
-  description = "The maximum allocated storage in gigabytes for the RDS instance."
-  type        = number
-  default     = 100
-}
-
-variable "storage_encrypted" {
-  description = "Whether to enable encryption for the RDS instance."
-  type        = bool
-  default     = true
-}
-
 variable "multi_az" {
   description = "Whether to create a Multi-AZ RDS instance."
-  type        = bool
-  default     = false
-}
-
-variable "publicly_accessible" {
-  description = "Whether the RDS instance should be publicly accessible."
   type        = bool
   default     = false
 }
@@ -278,12 +269,6 @@ variable "monitoring_interval" {
   description = "The interval in seconds for enhanced monitoring of the RDS instance (0 to disable)."
   type        = number
   default     = 0
-}
-
-variable "enabled_cloudwatch_logs" {
-  description = "A list of log types to enable for export to CloudWatch Logs."
-  type        = list(string)
-  default     = ["postgresql"]
 }
 
 # ==========================================

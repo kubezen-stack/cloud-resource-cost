@@ -47,3 +47,18 @@ output "ami_id_used" {
   description = "The AMI ID used for the EC2 instances"
   value       = module.ec2.ami_id_used
 }
+
+output "ecr_repository_url" {
+  description = "The URL of the ECR repository"
+  value       = module.ecr.repository_url
+}
+
+output "ecr_repository_name" {
+  description = "The name of the ECR repository"
+  value       = module.ecr.repository_name
+}
+
+output "ecr_push_commands" {
+  description = "Commands to build and push Docker image to ECR"
+  value       = module.ecr.summary_ecr.push_commands
+}

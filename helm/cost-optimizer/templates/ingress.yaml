@@ -32,7 +32,7 @@ spec:
           {{- range .paths }}
           - path: {{ .path }}
             {{- with .pathType }}
-            pathType: {{ .PathType}}
+            pathType: {{ .pathType }}
             {{- end }}
             backend:
               service:

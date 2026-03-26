@@ -138,6 +138,22 @@ module "alb" {
   depends_on = [module.vpc, module.security_groups, module.ec2]
 }
 
+module "ecr" {
+  source       = "../../modules/ecr"
+  project_name = var.project_name
+  environment  = var.environment
+  tags         = local.common_tags
+
+  scan_on_push         = true
+  image_tag_mutability = "MUTABLE"
+  max_image_count      = var.ecr_max_image_count
+
+  allow_ec2_pull = true
+  ec2_role_arn   = module.iam.ec2_role_arn
+
+  depends_on = [module.iam]
+}
+
 module "rds" {
   source                       = "../../modules/rds"
   count                        = var.enable_rds ? 1 : 0
