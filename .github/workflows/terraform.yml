@@ -34,7 +34,7 @@ on:
 
 env:
   TF_VERSION: "1.6.0"
-  WORGING_DIR: "terraform/environments/${{ github.event.inputs.environment}}"
+  WORKING_DIR: "terraform/environments/${{ github.event.inputs.environment}}"
   TARGET_ENV: "${{ github.event.inputs.environment || 'dev' }}"
 
 jobs:
@@ -45,7 +45,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: ${{ env.WORGING_DIR }}
+        working-directory: ${{ env.WORKING_DIR }}
 
     steps:
       - name: Checkout
@@ -74,15 +74,16 @@ jobs:
         continue-on-error: true
 
       - name: Terraform Plan
-        run: terraform plan \
-          -var="environment=${{ env.TARGET_ENV }}" \
-          -out=tfplan-${{ env.TARGET_ENV }}
+        run: |
+          terraform -chdir=${{ env.WORKING_DIR }} plan \
+            -var="environment=${{ env.TARGET_ENV }}" \
+            -out=tfplan-${{ env.TARGET_ENV }}
 
-      - name: Terraform Uplod Plan
+      - name: Terraform Upload Plan
         uses: actions/upload-artifact@v4
         with:
           name: tfplan-${{ env.TARGET_ENV }}
-          path: ${{ env.WORGING_DIR }}/tfplan
+          path: ${{ env.WORKING_DIR }}/tfplan-${{ env.TARGET_ENV }}
           retention-days: 5
 
   terraform-apply:
@@ -93,7 +94,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: ${{ env.WORGING_DIR }}
+        working-directory: ${{ env.WORKING_DIR }}
 
     needs: terraform-plan
 
@@ -116,11 +117,11 @@ jobs:
       - name: Terraform Init
         run: terraform init
 
-      - name: Downnload Plan
+      - name: Download Plan
         uses: actions/download-artifact@v4
         with:
           name: tfplan-${{ env.TARGET_ENV }}
-          path: ${{ env.WORGING_DIR }}
+          path: ${{ env.WORKING_DIR }}
 
       - name: Terraform Apply
         run: terraform apply -auto-approve tfplan-${{ env.TARGET_ENV }}
