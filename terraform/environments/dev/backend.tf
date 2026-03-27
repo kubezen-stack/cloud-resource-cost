@@ -1,4 +1,4 @@
-/*terraform {
+terraform {
   backend "s3" {
     bucket         = "cost-optimizer-terraform-state"
     key            = "dev/terraform.tfstate"
@@ -7,4 +7,3 @@
     encrypt        = true
   }
 }
-*/
