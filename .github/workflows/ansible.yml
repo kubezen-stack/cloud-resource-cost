@@ -1,1 +1,137 @@
+name: Ansible
 
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment"
+        required: true
+        default: "dev"
+        type: choice
+        options:
+          - dev
+          - stage
+          - prod
+      playbook:
+        description: "Playbook to run"
+        required: true
+        default: "site.yml"
+        type: choice
+        options:
+          - site.yml
+          - common.yml
+          - master_k8s.yml
+          - calico.yml
+          - worker_k8s.yml
+          - helm_group.yml
+
+env:
+  TF_VERSION: "1.6.0"
+
+jobs:
+  ansible:
+    name: "Ansible Provision K8s"
+    runs-on: "ubuntu-latest"
+    environment: "${{ github.event.inputs.environment || 'dev' }}"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Terraform Init
+        working-directory: terraform/environments/${{ github.event.inputs.environment }}
+        run: terraform init
+
+      - name: Get SSH name from terraform
+        id: tf_outputs
+        working-directory: terraform/environments/${{ github.event.inputs.environment }}
+        run: |
+          SSH_SECRET=$(terraform output -raw ssh_secret_name)
+          echo "ssh_secret=${SSH_SECRET}" >> $GITHUB_OUTPUT
+
+      - name: Get SSH key from Secrets Manager
+        id: get_ssh_key
+        run: |
+          SSH_KEY=$(aws secretsmanager get-secret-value \
+          --secret-id ${{ steps.tf_outputs.outputs.ssh_secret }} \
+          --query SecretString \
+          --output text)
+
+          PRIVATE_KEY=$(echo $SSH_KEY | jq -r '.private_key')
+
+          mkdir -p ~/.ssh
+          echo "$PRIVATE_KEY" > ~/.ssh/deploy_key.pem
+          chmod 600 ~/.ssh/deploy_key.pem
+          echo "private_key=~/.ssh/deploy_key.pem" >> $GITHUB_OUTPUT
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install Ansible and dependencies
+        run: |
+          python3 -m pip install ansible boto3 botocore
+          ansible-galaxy install -r requirements.yml
+
+      - name: Update ansible ssh key path
+        run: |
+          sed -i "s|ansible_ssh_private_key_file:.*|ansible_ssh_private_key_file: ${{ steps.get_ssh_key.outputs.private_key }}|" \
+            ansible/inventory/${{github.event.inputs.environment}}/group_vars/all.yml
+
+      - name: Run Ansible playbook
+        run: |
+          ansible-playbook \
+            -i ansible/inventory/${{github.event.inputs.environment}}/aws_ec2.yml \
+            ansible/playbooks/${{ github.event.inputs.playbook }} \
+            -v
+        env:
+          ANSIBLE_HOST_KEY_CHECKING: "False"
+
+      - name: Get kubeconfig from master node
+        if: contains(fromJson('["site.yml", "master_k8s.yml"]'), github.event.inputs.playbook)
+        id: kubeconfig
+        run: |
+          MASTER_IP=$(aws ec2 describe-instances \
+            --filters \
+              "Name=tag:Role,Values=master" \
+              "Name=tag:Environment,Values=${{ github.event.inputs.environment }}" \
+              "Name=tag:Project,Values=cost-optimizer" \
+              "Name=instance-state-name,Values=running" \
+            --query "Reservations[0].Instances[0].PublicIpAddress" \
+            --output text)
+
+          echo "Master IP: ${MASTER_IP}"
+
+          sleep 10
+
+          KUBECONFIG=$(ssh -i ~/.ssh/deploy_key.pem \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            ubuntu@${MASTER_IP} \
+            "cat ~/.kube/config")
+
+          aws secretsmanager put-secret-value \
+            --secret-id "cost-optimizer-${{ github.event.inputs.environment }}-kubeconfig" \
+            --secret-string "$KUBECONFIG" \
+            2>/dev/null || \
+          aws secretsmanager create-secret \
+            --name "cost-optimizer-${{ github.event.inputs.environment }}-kubeconfig" \
+            --description "Kubeconfig for cost-optimizer ${{ github.event.inputs.environment }} cluster" \
+            --secret-string "$KUBECONFIG"
+
+          echo "kubeconfig_secret=cost-optimizer-${{ github.event.inputs.environment }}-kubeconfig" >> $GITHUB_OUTPUT
+          echo "Kubeconfig saved to Secrets Manager"
