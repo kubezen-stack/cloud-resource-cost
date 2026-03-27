@@ -160,6 +160,12 @@ variable "ecr_max_image_count" {
   default     = 10
 }
 
+variable "force_delete" {
+  description = "Force deletion of the repository"
+  type        = bool
+  default     = true
+}
+
 # ==========================================
 # DATABASE (RDS)
 # ==========================================

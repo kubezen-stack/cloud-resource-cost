@@ -77,8 +77,8 @@ resource "aws_secretsmanager_secret" "ssh_private_key" {
 }
 
 resource "aws_secretsmanager_secret_version" "ssh_private_key" {
-  count         = var.key_name == "" ? 1 : 0
-  secret_id     = aws_secretsmanager_secret.ssh_private_key[0].id
+  count     = var.key_name == "" ? 1 : 0
+  secret_id = aws_secretsmanager_secret.ssh_private_key[0].id
   secret_string = jsonencode({
     private_key = tls_private_key.deployer_key[0].private_key_pem
     key_name    = aws_key_pair.deployer_key.key_name
@@ -129,7 +129,7 @@ module "iam" {
   enable_cost_explorer = var.enable_cost_explorer
   enable_vault_auth    = var.enable_vault_auth
   enable_ecr           = true
-  ecr_repository_arns  = [module.ecr.repository_arn]
+  ecr_repository_arns  = []
 
   tags = local.common_tags
 }
@@ -140,6 +140,7 @@ module "ecr" {
   environment  = var.environment
   tags         = local.common_tags
 
+  force_delete         = var.force_delete
   scan_on_push         = true
   image_tag_mutability = "MUTABLE"
   max_image_count      = var.ecr_max_image_count

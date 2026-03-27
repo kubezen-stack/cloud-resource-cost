@@ -13,6 +13,12 @@ variable "environment" {
   }
 }
 
+variable "force_delete" {
+  description = "Force deletion of the repository"
+  type        = bool
+  default     = false
+}
+
 variable "image_tag_mutability" {
   description = "Image tag mutability (MUTABLE or IMMUTABLE)"
   type        = string
