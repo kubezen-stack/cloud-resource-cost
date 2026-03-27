@@ -93,10 +93,12 @@ jobs:
             ansible/inventory/${{github.event.inputs.environment}}/group_vars/all.yml
 
       - name: Run Ansible playbook
+        working-directory: ansible
         run: |
           ansible-playbook \
-            -i ansible/inventory/${{github.event.inputs.environment}}/aws_ec2.yml \
-            ansible/playbooks/${{ github.event.inputs.playbook }} \
+            -i inventory/${{ github.event.inputs.environment }}/aws_ec2.yml \
+            playbooks/${{ github.event.inputs.playbook }} \
+            --private-key ${{ steps.get_ssh_key.outputs.private_key }} \
             -v
         env:
           ANSIBLE_HOST_KEY_CHECKING: "False"
