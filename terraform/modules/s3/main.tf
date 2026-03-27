@@ -56,6 +56,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "reports" {
   rule {
     id     = "cleanup-old-reports"
     status = "Enabled"
+    filter {}
 
     expiration {
       days = var.reports_lifecycle_days
@@ -111,6 +112,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "backups" {
   rule {
     id     = "cleanup-old-backups"
     status = "Enabled"
+    filter {}
 
     expiration {
       days = var.backups_lifecycle_days
