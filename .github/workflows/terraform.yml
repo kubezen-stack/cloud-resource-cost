@@ -1,1 +1,170 @@
+name: Terraform
 
+on:
+  push:
+    branches:
+      - "main"
+    paths:
+      - "terraform/**"
+  pull_request:
+    branches:
+      - "main"
+    paths:
+      - "terraform/**"
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Action to run"
+        required: true
+        default: "plan"
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
+      environment:
+        description: "Environment"
+        required: true
+        default: "dev"
+        type: choice
+        options:
+          - dev
+          - stage
+          - prod
+
+env:
+  TF_VERSION: "1.6.0"
+  WORGING_DIR: "terraform/environments/${{ github.event.inputs.environment}}"
+  TARGET_ENV: "${{ github.event.inputs.environment || 'dev' }}"
+
+jobs:
+  terraform-plan:
+    name: "Terraform Plan"
+    runs-on: "ubuntu-latest"
+    environment: "${{ github.event.inputs.environment || 'dev' }}"
+
+    defaults:
+      run:
+        working-directory: ${{ env.WORGING_DIR }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform format
+        run: terraform fmt -check -recursive
+
+      - name: Terraform Validate
+        run: terraform validate
+        continue-on-error: true
+
+      - name: Terraform Plan
+        run: terraform plan \
+          -var="environment=${{ env.TARGET_ENV }}" \
+          -out=tfplan-${{ env.TARGET_ENV }}
+
+      - name: Terraform Uplod Plan
+        uses: actions/upload-artifact@v3
+        with:
+          name: tfplan-${{ env.TARGET_ENV }}
+          path: ${{ env.WORGING_DIR }}/tfplan
+          retention-days: 5
+
+  terraform-apply:
+    name: "Terraform Apply"
+    runs-on: "ubuntu-latest"
+    environment: "${{ github.event.inputs.environment || 'dev' }}"
+    if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply' }}
+
+    defaults:
+      run:
+        working-directory: ${{ env.WORGING_DIR }}
+
+    needs: terraform-plan
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Downnload Plan
+        uses: actions/download-artifact@v3
+        with:
+          name: tfplan-${{ env.TARGET_ENV }}
+          path: ${{ env.WORGING_DIR }}
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve tfplan-${{ env.TARGET_ENV }}
+
+      - name: Save Terraform Outputs
+        id: tf_outputs
+        run: |
+          echo "ecr_url=$(terraform output -raw ecr_repository_url)" >> $GITHUB_OUTPUT
+
+      - name: Update Github Output
+        run: |
+          echo "ECR_REPOSITORY_URL=${{ steps.tf_outputs.outputs.ecr_url }}" >> $GITHUB_ENV
+
+  terraform-destroy:
+    name: "Terraform Destroy"
+    runs-on: "ubuntu-latest"
+    environment: "${{ github.event.inputs.environment}}"
+    if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'destroy' }}
+
+    defaults:
+      run:
+        working-directory: ${{ env.WORGING_DIR }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Destroy
+        run: |
+          terraform destroy \
+          -var="environment=${{ github.event.inputs.environment || 'dev' }}" \
+          -auto-approve
