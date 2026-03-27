@@ -62,3 +62,13 @@ output "ecr_push_commands" {
   description = "Commands to build and push Docker image to ECR"
   value       = module.ecr.summary_ecr.push_commands
 }
+
+output "ssh_secret_name" {
+  description = "AWS Secrets Manager secret name containing the SSH private key"
+  value       = length(aws_secretsmanager_secret.ssh_private_key) > 0 ? aws_secretsmanager_secret.ssh_private_key[0].name : null
+}
+
+output "key_name" {
+  description = "The name of the EC2 key pair"
+  value       = aws_key_pair.deployer_key.key_name
+}

@@ -18,6 +18,14 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
+    tls = {
+      source  = "hashicorp/tls"
+      version = "~> 4.0"
+    }
+    local = {
+      source  = "hashicorp/local"
+      version = "~> 2.0"
+    }
   }
 }
 
@@ -30,8 +38,7 @@ provider "aws" {
 }
 
 resource "tls_private_key" "deployer_key" {
-  count = var.key_name == "" ? 1 : 0
-
+  count     = var.key_name == "" ? 1 : 0
   algorithm = "RSA"
   rsa_bits  = 4096
 }
@@ -53,6 +60,30 @@ resource "local_sensitive_file" "private_key" {
   filename        = "${path.module}/../../../ssh/${aws_key_pair.deployer_key.key_name}.pem"
   content         = tls_private_key.deployer_key[0].private_key_pem
   file_permission = "0600"
+}
+
+resource "aws_secretsmanager_secret" "ssh_private_key" {
+  count                   = var.key_name == "" ? 1 : 0
+  name                    = "${local.hostname_tag}-ssh-private-key"
+  description             = "SSH private key for ${local.hostname_tag} EC2 instances"
+  recovery_window_in_days = 0
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "${local.hostname_tag}-ssh-private-key"
+    }
+  )
+}
+
+resource "aws_secretsmanager_secret_version" "ssh_private_key" {
+  count         = var.key_name == "" ? 1 : 0
+  secret_id     = aws_secretsmanager_secret.ssh_private_key[0].id
+  secret_string = jsonencode({
+    private_key = tls_private_key.deployer_key[0].private_key_pem
+    key_name    = aws_key_pair.deployer_key.key_name
+    environment = var.environment
+  })
 }
 
 module "vpc" {
@@ -97,8 +128,26 @@ module "iam" {
   enable_cloudwatch    = var.enable_cloudwatch
   enable_cost_explorer = var.enable_cost_explorer
   enable_vault_auth    = var.enable_vault_auth
+  enable_ecr           = true
+  ecr_repository_arns  = [module.ecr.repository_arn]
 
   tags = local.common_tags
+}
+
+module "ecr" {
+  source       = "../../modules/ecr"
+  project_name = var.project_name
+  environment  = var.environment
+  tags         = local.common_tags
+
+  scan_on_push         = true
+  image_tag_mutability = "MUTABLE"
+  max_image_count      = var.ecr_max_image_count
+
+  allow_ec2_pull = true
+  ec2_role_arn   = module.iam.ec2_role_arn
+
+  depends_on = [module.iam]
 }
 
 module "ec2" {
@@ -111,7 +160,7 @@ module "ec2" {
   subnet_ids           = var.nat_gateway_enabled ? module.vpc.private_subnet_ids : module.vpc.public_subnet_ids
   security_group_ids   = [module.security_groups.ec2_security_group_id]
   key_name             = aws_key_pair.deployer_key.key_name
-  iam_instance_profile = var.iam_instance_profile
+  iam_instance_profile = module.iam.ec2_instance_profile_name
   storage_size         = var.storage_size
   storage_type         = var.storage_type
   enable_monitoring    = var.enable_monitoring
@@ -136,22 +185,6 @@ module "alb" {
   tags = local.common_tags
 
   depends_on = [module.vpc, module.security_groups, module.ec2]
-}
-
-module "ecr" {
-  source       = "../../modules/ecr"
-  project_name = var.project_name
-  environment  = var.environment
-  tags         = local.common_tags
-
-  scan_on_push         = true
-  image_tag_mutability = "MUTABLE"
-  max_image_count      = var.ecr_max_image_count
-
-  allow_ec2_pull = true
-  ec2_role_arn   = module.iam.ec2_role_arn
-
-  depends_on = [module.iam]
 }
 
 module "rds" {

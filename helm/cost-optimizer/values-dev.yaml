@@ -1,0 +1,80 @@
+replicaCount: 1
+
+image:
+  repository: ""
+  pullPolicy: Always
+  tag: "dev"
+
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - host: cost-optimizer-dev.local
+      paths:
+        - path: /
+          pathType: Prefix
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 500m
+    memory: 512Mi
+
+app:
+  name: cost-optimizer
+  environment: dev
+  debug: "true"
+  version: "1.0.0"
+  logLevel: DEBUG
+  algorithm: "HS256"
+  accessTokenExpireMinutes: 10080
+  secretKey: ""
+
+  corsOrigins:
+    - "http://localhost:3000"
+    - "http://localhost:8000"
+
+database:
+  host: cost-optimizer-postgresql
+  port: 5432
+  name: cost_optimizer_dev
+  user: dbadmin
+  password: ""
+
+postgresql:
+  enabled: true
+  auth:
+    username: dbadmin
+    database: cost_optimizer_dev
+    password: ""
+  primary:
+    persistence:
+      enabled: true
+      size: 5Gi
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 250m
+        memory: 256Mi
+
+livenessProbe:
+  httpGet:
+    path: /api/v1/health/health
+    port: 8000
+  initialDelaySeconds: 15
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /api/v1/health/ready
+    port: 8000
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
