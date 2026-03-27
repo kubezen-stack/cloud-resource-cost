@@ -34,7 +34,7 @@ on:
 
 env:
   TF_VERSION: "1.6.0"
-  WORKING_DIR: "terraform/environments/${{ github.event.inputs.environment}}"
+  WORKING_DIR: "terraform/environments/${{ github.event.inputs.environment || 'dev' }}"
   TARGET_ENV: "${{ github.event.inputs.environment || 'dev' }}"
 
 jobs:
@@ -75,9 +75,9 @@ jobs:
 
       - name: Terraform Plan
         run: |
-          terraform -chdir=${{ env.WORKING_DIR }} plan \
-            -var="environment=${{ env.TARGET_ENV }}" \
-            -out=tfplan-${{ env.TARGET_ENV }}
+          terraform plan \
+          -var="environment=${{ env.TARGET_ENV }}" \
+          -out=tfplan-${{ env.TARGET_ENV }}
 
       - name: Terraform Upload Plan
         uses: actions/upload-artifact@v4
@@ -100,17 +100,17 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v3
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v2
+        uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
@@ -143,21 +143,21 @@ jobs:
 
     defaults:
       run:
-        working-directory: ${{ env.WORGING_DIR }}
+        working-directory: ${{ env.WORKING_DIR }}
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v3
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v2
+        uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
