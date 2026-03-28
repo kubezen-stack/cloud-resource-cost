@@ -34,6 +34,9 @@ jobs:
     name: "Build and Push Docker Image"
     runs-on: "ubuntu-latest"
     environment: "${{ github.event.inputs.environment || 'dev' }}"
+    outputs:
+      ecr_url: ${{ steps.tf_outputs.outputs.ecr_url }}
+      image_tag: ${{ steps.image_tag.outputs.TAG }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
