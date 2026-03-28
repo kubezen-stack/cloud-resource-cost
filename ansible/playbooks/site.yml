@@ -12,3 +12,6 @@
 
 - name: "Install Helm"
   import_playbook: helm_group.yml
+
+- name: "Install GitHub Actions self-hosted runner"
+  import_playbook: github_runner.yml
