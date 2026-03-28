@@ -1,1 +1,145 @@
+name: Deploy
 
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "src/**"
+      - "helm/**"
+      - "docker/**"
+
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to deploy"
+        required: true
+        default: "dev"
+        type: choice
+        options:
+          - dev
+          - stage
+          - prod
+      image_tag:
+        description: "Docker image tag (default: git sha)"
+        required: false
+        default: ""
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  TF_VERSION: "1.6.0"
+  ENVIRONMENT: ${{ github.event.inputs.environment || 'dev' }}
+
+jobs:
+  build-and-push:
+    name: "Build and Push Docker Image"
+    runs-on: "ubuntu-latest"
+    environment: "${{ github.event.inputs.environment || 'dev' }}"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Terraform Init
+        working-directory: terraform/environments/${{ github.event.inputs.environment }}
+        run: terraform init
+
+      - name: Get ECR URL from terraform
+        id: tf_outputs
+        working-directory: terraform/environments/${{ github.event.inputs.environment }}
+        run: |
+          ECR_URL=$(terraform output -raw ecr_repository_url)
+          echo "ecr_url=${ECR_URL}" >> $GITHUB_OUTPUT
+
+      - name: Login to ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Set Image Tag
+        id: image_tag
+        run: |
+          if [ -n "${{ github.event.inputs.image_tag }}" ]; then
+            TAG="${{ github.event.inputs.image_tag }}" >> $GITHUB_OUTPUT
+          else
+            TAG="${{ github.sha }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build Docker Image
+        run: |
+          docker build \
+          -f docker/Dockerfile \
+          -t ${{ steps.tf_outputs.outputs.ecr_url }}:${{ steps.image_tag.outputs.TAG }} \
+          -t ${{ steps.tf_outputs.outputs.ecr_url }}:${{ env.ENVIRONMENT }}
+
+      - name: Push Docker Image
+        run: |
+          docker push ${{ steps.tf_outputs.outputs.ecr_url }}:${{ steps.image_tag.outputs.TAG }}
+          docker push ${{ steps.tf_outputs.outputs.ecr_url }}:${{ env.ENVIRONMENT }}
+
+  helm-deploy-dev:
+    name: "Helm Deploy(dev)"
+    runs-on: "ubuntu-latest"
+    environment: "${{ github.event.inputs.environment || 'dev' }}"
+    needs: build-and-push
+    if: ${{ github.event.inputs.environment == 'dev' || github.event_name == 'push' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Get kubeconfig from Secrets Manager
+        run: |
+          KUBECONFIG_DATA=$(aws secretsmanager get-secret-value \
+            --secret-id "cost-optimizer-dev-kubeconfig" \
+            --query SecretString \
+            --output text)
+          mkdir -p ~/.kube
+          echo "$KUBECONFIG_DATA" > ~/.kube/config
+          chmod 600 ~/.kube/config
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: "v3.14.0"
+
+      - name: Helm install dependencies
+        run: |
+          helm repo add bitnami https://charts.bitnami.com/bitnami
+          helm repo add jetstack https://charts.jetstack.io
+          helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+          helm repo update
+
+      - name: Helm deploy
+        run: |
+          helm upgrade --install cost-optimizer ./helm/cost-optimizer \
+            -f ./helm/cost-optimizer/values-dev.yaml \
+            --set image.repository=${{ needs.build-and-push.outputs.ecr_url }} \
+            --set image.tag=${{ needs.build-and-push.outputs.image_tag }} \
+            --set app.secretKey=${{ secrets.DEV_SECRET_KEY }} \
+            --set database.password=${{ secrets.DEV_DB_PASSWORD }} \ 
+            --set postgresql.auth.password=${{ secrets.DEV_DB_PASSWORD }} \
+            --namespace cost-optimizer \
+            --create-namespace
+            --timeout 600s \
+            --wait
