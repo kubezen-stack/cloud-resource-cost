@@ -1,0 +1,87 @@
+- name: Check if runner is already configured
+  stat:
+    path: /home/ubuntu/actions-runner/.runner
+  register: runner_configured
+  tags: install
+
+- name: Create runner directory
+  file:
+    path: /home/ubuntu/actions-runner
+    state: directory
+    owner: ubuntu
+    group: ubuntu
+    mode: "0755"
+  tags: install
+
+- name: Download GitHub Actions runner
+  get_url:
+    url: "https://github.com/actions/runner/releases/download/v{{ runner_version }}/actions-runner-linux-x64-{{ runner_version }}.tar.gz"
+    dest: "/tmp/actions-runner.tar.gz"
+    mode: "0644"
+  when: not runner_configured.stat.exists
+  tags: install
+
+- name: Extract runner archive
+  unarchive:
+    src: /tmp/actions-runner.tar.gz
+    dest: /home/ubuntu/actions-runner
+    remote_src: yes
+    owner: ubuntu
+    group: ubuntu
+  when: not runner_configured.stat.exists
+  tags: install
+
+- name: Get runner registration token from GitHub API
+  uri:
+    url: "https://api.github.com/repos/{{ github_org }}/{{ github_repo }}/actions/runners/registration-token"
+    method: POST
+    headers:
+      Authorization: "Bearer {{ github_pat }}"
+      Accept: "application/vnd.github+json"
+      X-GitHub-Api-Version: "2022-11-28"
+    status_code: 201
+  register: runner_token_response
+  when: not runner_configured.stat.exists
+  tags: install
+
+- name: Configure runner
+  become: no
+  shell: |
+    ./config.sh \
+      --url https://github.com/{{ github_org }}/{{ github_repo }} \
+      --token {{ runner_token_response.json.token }} \
+      --name {{ runner_name }} \
+      --labels self-hosted,linux,x64,{{ environment }} \
+      --work _work \
+      --unattended
+  args:
+    chdir: /home/ubuntu/actions-runner
+  when: not runner_configured.stat.exists
+  tags: install
+
+- name: Install runner as systemd service
+  shell: ./svc.sh install ubuntu
+  args:
+    chdir: /home/ubuntu/actions-runner
+  when: not runner_configured.stat.exists
+  tags: install
+
+- name: Start runner service
+  shell: ./svc.sh start
+  args:
+    chdir: /home/ubuntu/actions-runner
+  when: not runner_configured.stat.exists
+  tags: install
+
+- name: Verify runner is active
+  shell: ./svc.sh status
+  args:
+    chdir: /home/ubuntu/actions-runner
+  register: runner_status
+  changed_when: false
+  tags: verify
+
+- name: Display runner status
+  debug:
+    var: runner_status.stdout_lines
+  tags: verify

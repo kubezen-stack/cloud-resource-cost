@@ -1,0 +1,6 @@
+- name: "Install and register GitHub Actions self-hosted runner"
+  hosts: master
+  become: yes
+
+  roles:
+    - github-runner

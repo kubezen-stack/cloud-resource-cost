@@ -24,6 +24,7 @@ on:
           - calico.yml
           - worker_k8s.yml
           - helm_group.yml
+          - github_runner.yml
 
 env:
   TF_VERSION: "1.6.0"
@@ -99,6 +100,7 @@ jobs:
             -i inventory/${{ github.event.inputs.environment }}/aws_ec2.yml \
             playbooks/${{ github.event.inputs.playbook }} \
             --private-key ${{ steps.get_ssh_key.outputs.private_key }} \
+            --extra-vars "github_pat=${{ secrets.GH_RUNNER_PAT }} environment=${{ github.event.inputs.environment }}" \
             -v
         env:
           ANSIBLE_HOST_KEY_CHECKING: "False"
@@ -115,8 +117,6 @@ jobs:
               "Name=instance-state-name,Values=running" \
             --query "Reservations[0].Instances[0].PublicIpAddress" \
             --output text)
-
-          sleep 10
 
           KUBECONFIG=$(ssh -i ~/.ssh/deploy_key.pem \
             -o StrictHostKeyChecking=no \
