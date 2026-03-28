@@ -95,15 +95,17 @@ jobs:
 
       - name: Run Ansible playbook
         working-directory: ansible
+        env:
+          ANSIBLE_HOST_KEY_CHECKING: "False"
+          GITHUB_PAT: ${{ secrets.GH_RUNNER_PAT }}
+          DEPLOY_ENV: ${{ github.event.inputs.environment || 'dev' }}
         run: |
           ansible-playbook \
             -i inventory/${{ github.event.inputs.environment }}/aws_ec2.yml \
             playbooks/${{ github.event.inputs.playbook }} \
             --private-key ${{ steps.get_ssh_key.outputs.private_key }} \
-            --extra-vars "github_pat=${{ secrets.GH_RUNNER_PAT }} environment=${{ github.event.inputs.environment }}" \
+            --extra-vars "github_pat=${GITHUB_PAT} environment=${DEPLOY_ENV}" \
             -v
-        env:
-          ANSIBLE_HOST_KEY_CHECKING: "False"
 
       - name: Get kubeconfig from master node
         if: contains(fromJson('["site.yml", "master_k8s.yml"]'), github.event.inputs.playbook)
