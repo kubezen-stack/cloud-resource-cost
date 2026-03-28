@@ -94,7 +94,7 @@ jobs:
 
   helm-deploy-dev:
     name: "Helm Deploy(dev)"
-    runs-on: "ubuntu-latest"
+    runs-on: "self-hosted"
     environment: "${{ github.event.inputs.environment || 'dev' }}"
     needs: build-and-push
     if: ${{ github.event.inputs.environment == 'dev' || github.event_name == 'push' }}

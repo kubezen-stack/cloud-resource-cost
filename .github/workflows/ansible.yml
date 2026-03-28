@@ -116,8 +116,6 @@ jobs:
             --query "Reservations[0].Instances[0].PublicIpAddress" \
             --output text)
 
-          echo "Master IP: ${MASTER_IP}"
-
           sleep 10
 
           KUBECONFIG=$(ssh -i ~/.ssh/deploy_key.pem \
