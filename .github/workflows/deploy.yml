@@ -73,17 +73,19 @@ jobs:
         id: image_tag
         run: |
           if [ -n "${{ github.event.inputs.image_tag }}" ]; then
-            TAG="${{ github.event.inputs.image_tag }}" >> $GITHUB_OUTPUT
+            TAG="${{ github.event.inputs.image_tag }}"
           else
-            TAG="${{ github.sha }}" >> $GITHUB_OUTPUT
+            TAG="${{ github.sha }}"
           fi
+          echo "TAG=${TAG}" >> $GITHUB_OUTPUT
 
       - name: Build Docker Image
         run: |
           docker build \
           -f docker/Dockerfile \
           -t ${{ steps.tf_outputs.outputs.ecr_url }}:${{ steps.image_tag.outputs.TAG }} \
-          -t ${{ steps.tf_outputs.outputs.ecr_url }}:${{ env.ENVIRONMENT }}
+          -t ${{ steps.tf_outputs.outputs.ecr_url }}:${{ env.ENVIRONMENT }} \
+          .
 
       - name: Push Docker Image
         run: |
@@ -136,13 +138,13 @@ jobs:
       - name: Helm deploy
         run: |
           helm upgrade --install cost-optimizer ./helm/cost-optimizer \
-            -f ./helm/cost-optimizer/values-dev.yaml \
-            --set image.repository=${{ needs.build-and-push.outputs.ecr_url }} \
-            --set image.tag=${{ needs.build-and-push.outputs.image_tag }} \
-            --set app.secretKey=${{ secrets.DEV_SECRET_KEY }} \
-            --set database.password=${{ secrets.DEV_DB_PASSWORD }} \ 
-            --set postgresql.auth.password=${{ secrets.DEV_DB_PASSWORD }} \
-            --namespace cost-optimizer \
-            --create-namespace
-            --timeout 600s \
-            --wait
+          -f ./helm/cost-optimizer/values-dev.yaml \
+          --set image.repository=${{ needs.build-and-push.outputs.ecr_url }} \
+          --set image.tag=${{ needs.build-and-push.outputs.image_tag }} \
+          --set app.secretKey=${{ secrets.DEV_SECRET_KEY }} \
+          --set database.password=${{ secrets.DEV_DB_PASSWORD }} \
+          --set postgresql.auth.password=${{ secrets.DEV_DB_PASSWORD }} \
+          --namespace cost-optimizer \
+          --create-namespace \
+          --timeout 600s \
+          --wait
