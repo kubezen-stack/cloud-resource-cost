@@ -7,12 +7,12 @@ metadata:
     {{- include "cost-optimizer.labels" . | nindent 4 }}
     component: migration
   annotations:
-    "helm.sh/hook": pre-install,pre-upgrade
-    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "5"
     "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
 spec:
   ttlSecondsAfterFinished: 300
-  backoffLimit: 2
+  backoffLimit: 5
   template:
     metadata:
       labels:
@@ -20,6 +20,10 @@ spec:
         component: migration
     spec:
       restartPolicy: Never
+      initContainers:
+        - name: wait-for-db
+          image: busybox
+          command: ['sh', '-c', 'until nc -z {{ .Values.database.host }} {{ .Values.database.port }}; do echo "waiting for postgresql..."; sleep 5; done']
       containers:
         - name: alembic-migrate
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"

@@ -135,6 +135,9 @@ jobs:
           helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
           helm repo update
 
+      - name: Helm update dependencies
+        run: helm dependency update ./helm/cost-optimizer
+
       - name: Helm deploy
         run: |
           helm upgrade --install cost-optimizer ./helm/cost-optimizer \

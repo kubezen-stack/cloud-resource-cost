@@ -27,3 +27,9 @@ keywords:
   - aws
   - cost-optimizer
   - fastapi
+
+dependencies:
+  - name: postgresql
+    version: "13.2.27"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: postgresql.enabled
