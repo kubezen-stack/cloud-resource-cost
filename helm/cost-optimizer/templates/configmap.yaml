@@ -3,7 +3,7 @@ kind: ConfigMap
 metadata:
   name: {{ include "cost-optimizer.fullname" . }}-config
   namespace: {{ .Release.Namespace }}
-  labels: {{ - include "cost-optimizer.labels" . | nindent 4 }}
+  labels: {{- include "cost-optimizer.labels" . | nindent 4 }}
 data:
   ENVIRONMENT: {{ .Values.app.environment | quote }}
   DEBUG: {{ .Values.app.debug | quote }}
