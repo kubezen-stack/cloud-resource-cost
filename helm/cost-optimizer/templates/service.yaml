@@ -3,7 +3,8 @@ kind: Service
 metadata:
   name: {{ include "cost-optimizer.fullname" . }}
   namespace: {{ .Release.Namespace }}
-  labels: {{ - include "cost-optimizer.labels" . | nindent 4 }}
+  labels:
+    {{- include "cost-optimizer.labels" . | nindent 4 }}
 spec:
   type: {{ .Values.service.type }}
   ports:
@@ -11,4 +12,5 @@ spec:
       targetPort: {{ .Values.service.targetPort }}
       protocol: TCP
       name: http
-  selector: {{ - include "cost-optimizer.selectorLabels" . | nindent 4 }}
+  selector:
+    {{- include "cost-optimizer.selectorLabels" . | nindent 4 }}
