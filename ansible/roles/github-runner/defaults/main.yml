@@ -1,6 +1,6 @@
 runner_version: "2.333.0"
 github_org: "kubezen-stack"
 github_repo: "cloud-resource-cost"
-runner_name: "cost-optimizer-{{ environment }}"
+runner_name: "{{ inventory_hostname }}"
 environment: ""
 github_pat: ""
