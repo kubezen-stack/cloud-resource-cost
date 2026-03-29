@@ -10,6 +10,12 @@ service:
   port: 80
   targetPort: 8000
 
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 80
+
 ingress:
   enabled: false
   className: nginx

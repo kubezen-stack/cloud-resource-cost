@@ -5,6 +5,9 @@ image:
   pullPolicy: Always
   tag: "dev"
 
+autoscaling:
+  enabled: false
+
 ingress:
   enabled: true
   className: nginx
