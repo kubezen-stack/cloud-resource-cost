@@ -135,6 +135,9 @@ jobs:
           helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
           helm repo update
 
+      - name: Debug ECR URL
+        run: echo "ECR URL = ${{ needs.build-and-push.outputs.ecr_url }}"
+
       - name: Helm update dependencies
         run: helm dependency update ./helm/cost-optimizer
 
