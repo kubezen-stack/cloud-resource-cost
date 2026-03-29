@@ -55,12 +55,12 @@ jobs:
           terraform_wrapper: false
 
       - name: Terraform Init
-        working-directory: terraform/environments/${{ github.event.inputs.environment }}
+        working-directory: terraform/environments/${{ env.ENVIRONMENT }}
         run: terraform init
 
       - name: Get ECR URL from terraform
         id: tf_outputs
-        working-directory: terraform/environments/${{ github.event.inputs.environment }}
+        working-directory: terraform/environments/${{ env.ENVIRONMENT }}
         run: |
           ECR_URL=$(terraform output -raw ecr_repository_url)
           echo "ecr_url=${ECR_URL}" >> $GITHUB_OUTPUT
