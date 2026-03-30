@@ -28,7 +28,7 @@
   tags: swap
 
 - name: Load kernel modules
-  modprobe:
+  community.general.modprobe:
     name: "{{ item }}"
     state: present
   loop: "{{ kernel_modules }}"
