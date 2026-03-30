@@ -24,32 +24,42 @@
     state: absent
   tags: cleanup
 
-- name: Get ECR authorization token for Secret
-  amazon.aws.ecr_auth:
-    region: "{{ aws_region | default('us-east-1') }}"
-  register: ecr_auth
+- name: Get ECR registry URL
+  ansible.builtin.shell: |
+    aws ecr describe-repositories \
+      --repository-names "cost-optimizer-{{ target_env }}" \
+      --query "repositories[0].repositoryUri" \
+      --output text | cut -d'/' -f1
+  register: ecr_registry_url
+  changed_when: false
+  tags: ecr_secret
+
+- name: Get ECR authorization token
+  ansible.builtin.shell: |
+    aws ecr get-login-password --region {{ aws_region | default('us-east-1') }}
+  register: ecr_token
+  changed_when: false
   tags: ecr_secret
 
 - name: Create cost-optimizer namespace
-  kubernetes.core.k8s:
-    name: cost-optimizer
-    api_version: v1
-    kind: Namespace
-    state: present
+  ansible.builtin.shell: |
+    kubectl create namespace cost-optimizer --dry-run=client -o yaml | kubectl apply -f -
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
+  changed_when: false
   tags: ecr_secret
 
 - name: Create imagePullSecret in Kubernetes
-  kubernetes.core.k8s:
-    state: present
-    definition:
-      apiVersion: v1
-      kind: Secret
-      metadata:
-        name: ecr-secret
-        namespace: cost-optimizer
-      type: kubernetes.io/dockerconfigjson
-      data:
-        .dockerconfigjson: "{{ { 'auths': { (ecr_auth.url | ansible.builtin.regex_replace('^https://', '')): { 'auth': ( 'AWS:' + ecr_auth.password ) | ansible.builtin.b64encode } } } | ansible.builtin.to_json | ansible.builtin.b64encode }}"
+  ansible.builtin.shell: |
+    kubectl create secret docker-registry ecr-secret \
+      --docker-server={{ ecr_registry_url.stdout }} \
+      --docker-username=AWS \
+      --docker-password={{ ecr_token.stdout }} \
+      --namespace cost-optimizer \
+      --dry-run=client -o yaml | kubectl apply -f -
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
+  changed_when: false
   tags: ecr_secret
 
 - name: Add Helm repositories
