@@ -131,7 +131,7 @@
       - "values-{{ target_env }}.yaml"
     values:
       image:
-        repository: "{{ ecr_auth.url | ansible.builtin.regex_replace('^https://', '') }}/cost-optimizer-{{ target_env }}"
+        repository: "{{ ecr_registry_url.stdout }}/cost-optimizer-{{ target_env }}"
   environment:
     KUBECONFIG: /home/ubuntu/.kube/config
   tags: deploy
