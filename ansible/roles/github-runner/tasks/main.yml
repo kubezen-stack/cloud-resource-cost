@@ -29,6 +29,38 @@
   changed_when: false
   tags: install
 
+- name: Install Terraform dependencies
+  apt:
+    name:
+      - gnupg
+      - software-properties-common
+    state: present
+  tags: terraform
+
+- name: Add HashiCorp GPG key
+  apt_key:
+    url: https://apt.releases.hashicorp.com/gpg
+    state: present
+  tags: terraform
+
+- name: Add HashiCorp repository
+  apt_repository:
+    repo: "deb [arch=amd64] https://apt.releases.hashicorp.com {{ ansible_distribution_release }} main"
+    state: present
+    update_cache: yes
+  tags: terraform
+
+- name: Install Terraform
+  apt:
+    name: "terraform=1.6.0-*"
+    state: present
+  tags: terraform
+
+- name: Verify Terraform
+  command: terraform version
+  changed_when: false
+  tags: terraform
+
 - name: Check if runner is already configured
   stat:
     path: /home/ubuntu/actions-runner/.runner
