@@ -92,18 +92,21 @@
     - "/home/ubuntu/.docker"
   tags: containerd
 
-- name: Create ECR registry directory and hosts.toml
-  ansible.builtin.block:
-    - ansible.builtin.file:
-        path: "/etc/containerd/certs.d/{{ ecr_registry_url.stdout }}"
-        state: directory
-        mode: "0755"
-    - ansible.builtin.copy:
-        dest: "/etc/containerd/certs.d/{{ ecr_registry_url.stdout }}/hosts.toml"
-        content: |
-          server = "https://{{ ecr_registry_url.stdout }}"
-          [host."https://{{ ecr_registry_url.stdout }}"]
-            capabilities = ["pull", "resolve"]
+- name: Create ECR registry directory
+  ansible.builtin.file:
+    path: "/etc/containerd/certs.d/{{ ecr_registry_url.stdout }}"
+    state: directory
+    mode: "0755"
+  notify: restarted containerd
+  tags: containerd
+
+- name: Create ECR hosts.toml
+  ansible.builtin.copy:
+    dest: "/etc/containerd/certs.d/{{ ecr_registry_url.stdout }}/hosts.toml"
+    content: |
+      server = "https://{{ ecr_registry_url.stdout }}"
+      [host."https://{{ ecr_registry_url.stdout }}"]
+        capabilities = ["pull", "resolve"]
   notify: restarted containerd
   tags: containerd
 
