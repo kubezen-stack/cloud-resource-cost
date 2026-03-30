@@ -85,7 +85,7 @@ jobs:
 
       - name: Install Ansible and dependencies
         run: |
-          python3 -m pip install ansible boto3 botocore kubernetes
+          python3 -m pip install ansible-core boto3 botocore kubernetes
           ansible-galaxy collection install -r ansible/requirements.yml -p ./ansible/collections --force
 
       - name: Update ansible ssh key path
