@@ -45,7 +45,7 @@
   tags: kernel
 
 - name: Configure sysctl parameters
-  sysctl:
+  ansible.posix.sysctl:
     name: "{{ item.name }}"
     value: "{{ item.value }}"
     state: present
