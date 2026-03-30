@@ -24,6 +24,34 @@
     state: absent
   tags: cleanup
 
+- name: Get ECR authorization token for Secret
+  amazon.aws.ecr_auth:
+    region: "{{ aws_region | default('us-east-1') }}"
+  register: ecr_auth
+  tags: ecr_secret
+
+- name: Create cost-optimizer namespace
+  kubernetes.core.k8s:
+    name: cost-optimizer
+    api_version: v1
+    kind: Namespace
+    state: present
+  tags: ecr_secret
+
+- name: Create imagePullSecret in Kubernetes
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: ecr-secret
+        namespace: cost-optimizer
+      type: kubernetes.io/dockerconfigjson
+      data:
+        .dockerconfigjson: "{{ { 'auths': { (ecr_auth.url | regex_replace('^https://', '')): { 'auth': ( 'AWS:' + ecr_auth.password ) | b64encode } } } | to_json | b64encode }}"
+  tags: ecr_secret
+
 - name: Add Helm repositories
   become: no
   kubernetes.core.helm_repository:
@@ -56,6 +84,22 @@
   register: helm_list
   changed_when: false
   tags: verify
+
+- name: Deploy Cost Optimizer Helm Chart
+  become: no
+  kubernetes.core.helm:
+    name: cost-optimizer
+    chart_ref: "./helm/cost-optimizer"
+    release_namespace: cost-optimizer
+    values_files:
+      - values.yaml
+      - "values-{{ environment }}.yaml"
+    values:
+      image:
+        repository: "{{ ecr_auth.url | regex_replace('^https://', '') }}/cost-optimizer-{{ environment }}"
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
+  tags: deploy
 
 - name: Display Helm test connection
   debug:

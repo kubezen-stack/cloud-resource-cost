@@ -1,9 +1,9 @@
 replicaCount: 1
 
 image:
-  repository: cost-optimizer
-  pullPolicy: IfNotPresent
+  repository: ""
   tag: "latest"
+imagePullSecrets: []
 
 service:
   type: ClusterIP

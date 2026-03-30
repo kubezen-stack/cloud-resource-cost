@@ -147,6 +147,19 @@ jobs:
 
       - name: Helm update dependencies
         run: helm dependency update ./helm/cost-optimizer
+      
+      - name: Create ECR Secret in K8s
+        run: |
+          ECR_PASSWORD=$(aws ecr get-login-password --region ${{ env.AWS_REGION }})
+          
+          kubectl create namespace cost-optimizer --dry-run=client -o yaml | kubectl apply -f -
+          
+          kubectl create secret docker-registry ecr-secret \
+            --docker-server=${{ steps.ecr.outputs.ecr_url }} \
+            --docker-username=AWS \
+            --docker-password=$ECR_PASSWORD \
+            --namespace cost-optimizer \
+            --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Helm deploy
         run: |
