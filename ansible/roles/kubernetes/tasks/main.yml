@@ -152,16 +152,15 @@
   tags: k8s_packages
 
 - name: Hold kubeadm, kubelet and kubectl
-  community.general.dpkg_selections:
-    name: "{{ item }}"
-    selection: hold
+  ansible.builtin.shell: apt-mark hold {{ item }}
   loop:
     - kubeadm
     - kubelet
     - kubectl
+  changed_when: false
   tags: k8s_packages
 
-- name: Enable kubelet service (will start after kubeadm init)
+- name: Enable kubelet service
   ansible.builtin.systemd:
     name: kubelet
     enabled: yes
@@ -179,7 +178,7 @@
   become: no
   tags: verify
 
-- name: Verify containerd is running (final check)
+- name: Verify containerd is running
   ansible.builtin.systemd:
     name: containerd
     state: started
