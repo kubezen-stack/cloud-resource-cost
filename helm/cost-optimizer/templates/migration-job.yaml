@@ -20,6 +20,10 @@ spec:
         component: migration
     spec:
       restartPolicy: Never
+      imagePullSecrets:
+        {{- range .Values.imagePullSecrets }}
+        - name: {{ .name }}
+        {{- end }}
       initContainers:
         - name: wait-for-db
           image: busybox
