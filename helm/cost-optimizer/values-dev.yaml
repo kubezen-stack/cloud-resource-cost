@@ -8,6 +8,9 @@ image:
 autoscaling:
   enabled: false
 
+imagePullSecrets:
+  - name: ecr-secret
+
 ingress:
   enabled: true
   className: nginx
