@@ -120,22 +120,6 @@
   changed_when: false
   tags: verify
 
-- name: Deploy Cost Optimizer Helm Chart
-  become: no
-  kubernetes.core.helm:
-    name: cost-optimizer
-    chart_ref: "./helm/cost-optimizer"
-    release_namespace: cost-optimizer
-    values_files:
-      - values.yaml
-      - "values-{{ target_env }}.yaml"
-    values:
-      image:
-        repository: "{{ ecr_registry_url.stdout }}/cost-optimizer-{{ target_env }}"
-  environment:
-    KUBECONFIG: /home/ubuntu/.kube/config
-  tags: deploy
-
 - name: Display Helm test connection
   ansible.builtin.debug:
     msg: "Helm successfully configured and connected to Kubernetes"
