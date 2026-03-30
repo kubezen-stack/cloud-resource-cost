@@ -52,7 +52,7 @@
 
 - name: Install Terraform
   apt:
-    name: "terraform=1.6.0-*"
+    name: "terraform"
     state: present
   tags: terraform
 
