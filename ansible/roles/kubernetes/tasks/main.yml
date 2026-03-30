@@ -34,11 +34,8 @@
   shell: containerd config default > /etc/containerd/config.toml
   tags: containerd
 
-- name: Enable certs.d config path in containerd
-  replace:
-    path: /etc/containerd/config.toml
-    regexp: 'config_path = ""'
-    replace: 'config_path = "/etc/containerd/certs.d"'
+- name: Enable SystemdCgroup in containerd (sed method)
+  shell: sed -i 's/SystemdCgroup = false/SystemdCgroup = true/g' /etc/containerd/config.toml
   notify: restarted containerd
   tags: containerd
 
@@ -118,9 +115,11 @@
   notify: restarted containerd
   tags: containerd
 
-- name: Enable SystemdCgroup in containerd (sed method)
-  shell: sed -i 's/SystemdCgroup = false/SystemdCgroup = true/g' /etc/containerd/config.toml
-  notify: restarted containerd
+- name: Verify the change was applied
+  shell: grep -c "SystemdCgroup = true" /etc/containerd/config.toml
+  register: systemd_cgroup_count
+  changed_when: false
+  failed_when: systemd_cgroup_count.stdout == "0"
   tags: containerd
 
 - name: Remove disabled_plugins cri from containerd config
