@@ -24,6 +24,7 @@ on:
         description: "Docker image tag (default: git sha)"
         required: false
         default: ""
+
 env:
   AWS_REGION: ${{ secrets.AWS_REGION }}
   TF_VERSION: "1.6.0"
@@ -35,7 +36,6 @@ jobs:
     runs-on: "ubuntu-latest"
     environment: "${{ github.event.inputs.environment || 'dev' }}"
     outputs:
-      ecr_url: ${{ steps.tf_outputs.outputs.ecr_url }}
       image_tag: ${{ steps.image_tag.outputs.TAG }}
     steps:
       - name: Checkout code
@@ -63,6 +63,7 @@ jobs:
         working-directory: terraform/environments/${{ env.ENVIRONMENT }}
         run: |
           ECR_URL=$(terraform output -raw ecr_repository_url)
+          echo "ECR_URL is: ${ECR_URL}"
           echo "ecr_url=${ECR_URL}" >> $GITHUB_OUTPUT
 
       - name: Login to ECR
@@ -110,6 +111,15 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
+      - name: Get ECR URL from terraform
+        id: ecr
+        run: |
+          cd terraform/environments/${{ env.ENVIRONMENT }}
+          terraform init -reconfigure
+          ECR_URL=$(terraform output -raw ecr_repository_url)
+          echo "ECR_URL is: ${ECR_URL}"
+          echo "ecr_url=${ECR_URL}" >> $GITHUB_OUTPUT
+
       - name: Get kubeconfig from Secrets Manager
         run: |
           KUBECONFIG_DATA=$(aws secretsmanager get-secret-value \
@@ -135,9 +145,6 @@ jobs:
           helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
           helm repo update
 
-      - name: Debug ECR URL
-        run: echo "ECR URL = ${{ needs.build-and-push.outputs.ecr_url }}"
-
       - name: Helm update dependencies
         run: helm dependency update ./helm/cost-optimizer
 
@@ -145,7 +152,7 @@ jobs:
         run: |
           helm upgrade --install cost-optimizer ./helm/cost-optimizer \
           -f ./helm/cost-optimizer/values-dev.yaml \
-          --set image.repository=${{ needs.build-and-push.outputs.ecr_url }} \
+          --set image.repository=${{ steps.ecr.outputs.ecr_url }} \
           --set image.tag=${{ needs.build-and-push.outputs.image_tag }} \
           --set app.secretKey=${{ secrets.DEV_SECRET_KEY }} \
           --set database.password=${{ secrets.DEV_DB_PASSWORD }} \
