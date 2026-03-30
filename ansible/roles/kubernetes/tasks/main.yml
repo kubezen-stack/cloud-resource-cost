@@ -34,16 +34,93 @@
   shell: containerd config default > /etc/containerd/config.toml
   tags: containerd
 
-- name: Enable SystemdCgroup in containerd (sed method)
-  shell: sed -i 's/SystemdCgroup = false/SystemdCgroup = true/g' /etc/containerd/config.toml
+- name: Enable certs.d config path in containerd
+  replace:
+    path: /etc/containerd/config.toml
+    regexp: 'config_path = ""'
+    replace: 'config_path = "/etc/containerd/certs.d"'
   notify: restarted containerd
   tags: containerd
 
-- name: Verify the change was applied
-  shell: grep -c "SystemdCgroup = true" /etc/containerd/config.toml
-  register: systemd_cgroup_count
+- name: Get ECR registry URL
+  shell: |
+    aws ecr describe-repositories \
+      --repository-names "cost-optimizer-{{ environment }}" \
+      --query "repositories[0].repositoryUri" \
+      --output text | cut -d'/' -f1
+  register: ecr_registry_url
   changed_when: false
-  failed_when: systemd_cgroup_count.stdout == "0"
+  tags: containerd
+
+- name: Install amazon-ecr-credential-helper
+  apt:
+    name: amazon-ecr-credential-helper
+    state: present
+  tags: containerd
+
+- name: Create docker config directory for root
+  file:
+    path: /root/.docker
+    state: directory
+    mode: "0755"
+  tags: containerd
+
+- name: Create docker config directory for ubuntu
+  file:
+    path: /home/ubuntu/.docker
+    state: directory
+    owner: ubuntu
+    group: ubuntu
+    mode: "0755"
+  tags: containerd
+
+- name: Configure ECR credential helper for root
+  copy:
+    dest: /root/.docker/config.json
+    content: |
+      {
+        "credHelpers": {
+          "{{ ecr_registry_url.stdout }}": "ecr-login"
+        }
+      }
+    mode: "0644"
+  tags: containerd
+
+- name: Configure ECR credential helper for ubuntu
+  copy:
+    dest: /home/ubuntu/.docker/config.json
+    content: |
+      {
+        "credHelpers": {
+          "{{ ecr_registry_url.stdout }}": "ecr-login"
+        }
+      }
+    owner: ubuntu
+    group: ubuntu
+    mode: "0644"
+  tags: containerd
+
+- name: Create ECR registry directory
+  file:
+    path: "/etc/containerd/certs.d/{{ ecr_registry_url.stdout }}"
+    state: directory
+    mode: "0755"
+  tags: containerd
+
+- name: Create ECR hosts.toml
+  copy:
+    dest: "/etc/containerd/certs.d/{{ ecr_registry_url.stdout }}/hosts.toml"
+    content: |
+      server = "https://{{ ecr_registry_url.stdout }}"
+      [host."https://{{ ecr_registry_url.stdout }}"]
+        capabilities = ["pull", "resolve"]
+    mode: "0644"
+  notify: restarted containerd
+  tags: containerd
+
+- name: Enable SystemdCgroup in containerd (sed method)
+  shell: sed -i 's/SystemdCgroup = false/SystemdCgroup = true/g' /etc/containerd/config.toml
+  notify: restarted containerd
   tags: containerd
 
 - name: Remove disabled_plugins cri from containerd config
