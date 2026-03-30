@@ -1,11 +1,11 @@
 - name: Display CRD readiness status
-  debug:
+  ansible.builtin.debug:
     msg: "Calico CRD is established and ready for use"
   tags: wait
 
 - name: Create Calico FelixConfiguration
   become: no
-  shell: |
+  ansible.builtin.shell: |
     cat <<EOF | kubectl apply -f -
     apiVersion: crd.projectcalico.org/v1
     kind: FelixConfiguration
@@ -27,13 +27,13 @@
   tags: configure
 
 - name: Display FelixConfiguration result
-  debug:
+  ansible.builtin.debug:
     var: felix_config_result.stdout_lines
   tags: configure
 
 - name: Wait for IPPool CRD to be established
   become: no
-  shell: |
+  ansible.builtin.shell: |
     kubectl get crd ippools.crd.projectcalico.org -o jsonpath='{.status.conditions[?(@.type=="Established")].status}'
   environment:
     KUBECONFIG: /home/ubuntu/.kube/config
@@ -46,7 +46,7 @@
 
 - name: Create Calico IPPool configuration
   become: no
-  shell: |
+  ansible.builtin.shell: |
     cat <<EOF | kubectl apply -f -
     apiVersion: crd.projectcalico.org/v1
     kind: IPPool
@@ -69,13 +69,13 @@
   tags: configure
 
 - name: Display IPPool result
-  debug:
+  ansible.builtin.debug:
     var: ippool_result.stdout_lines
   tags: configure
 
 - name: Verify Calico FelixConfiguration
   become: no
-  command: kubectl get felixconfiguration default -o yaml
+  ansible.builtin.command: kubectl get felixconfiguration default -o yaml
   environment:
     KUBECONFIG: /home/ubuntu/.kube/config
   register: felix_verify
@@ -83,13 +83,13 @@
   tags: verify
 
 - name: Display FelixConfiguration
-  debug:
+  ansible.builtin.debug:
     msg: "{{ felix_verify.stdout_lines }}"
   tags: verify
 
 - name: Verify Calico IPPool
   become: no
-  command: kubectl get ippool -o wide
+  ansible.builtin.command: kubectl get ippool -o wide
   environment:
     KUBECONFIG: /home/ubuntu/.kube/config
   register: ippool_verify
@@ -97,13 +97,13 @@
   tags: verify
 
 - name: Display IPPool
-  debug:
+  ansible.builtin.debug:
     msg: "{{ ippool_verify.stdout_lines }}"
   tags: verify
 
 - name: Wait for Calico pods to be ready
   become: no
-  shell: kubectl get pods -n kube-system -l k8s-app=calico-node --no-headers | grep -c "Running" || echo "0"
+  ansible.builtin.shell: kubectl get pods -n kube-system -l k8s-app=calico-node --no-headers | grep -c "Running" || echo "0"
   environment:
     KUBECONFIG: /home/ubuntu/.kube/config
   register: calico_pods_running
@@ -115,7 +115,7 @@
 
 - name: Get Calico pods status
   become: no
-  command: kubectl get pods -n kube-system -l k8s-app=calico-node -o wide
+  ansible.builtin.command: kubectl get pods -n kube-system -l k8s-app=calico-node -o wide
   environment:
     KUBECONFIG: /home/ubuntu/.kube/config
   register: calico_pods_status
@@ -123,13 +123,13 @@
   tags: verify
 
 - name: Display Calico pods
-  debug:
+  ansible.builtin.debug:
     var: calico_pods_status.stdout_lines
   tags: verify
 
 - name: Verify Calico node status
   become: no
-  command: kubectl get nodes -o wide
+  ansible.builtin.command: kubectl get nodes -o wide
   environment:
     KUBECONFIG: /home/ubuntu/.kube/config
   register: nodes_status
@@ -137,6 +137,6 @@
   tags: verify
 
 - name: Display nodes status
-  debug:
+  ansible.builtin.debug:
     msg: "{{ nodes_status.stdout_lines }}"
   tags: verify

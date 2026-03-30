@@ -1,59 +1,59 @@
 - name: Check is Worker Node is already joined to Cluster
-  stat:
+  ansible.builtin.stat:
     path: /etc/kubernetes/kubelet.conf
   register: kubelet_exists
   tags: join
 
 - name: Wait for join command file to be created
   become: no
-  wait_for:
+  ansible.builtin.wait_for:
     path: "{{ playbook_dir }}/join-command.sh"
     timeout: 300
   delegate_to: localhost
   when: not kubelet_exists.stat.exists
   tags: join
 
-- name: Copy join command to local file
-  copy:
+- name: Copy join command to worker node
+  ansible.builtin.copy:
     src: "{{ playbook_dir }}/join-command.sh"
     dest: /tmp/join-command.sh
-    mode: 0755
+    mode: "0755"
   when: not kubelet_exists.stat.exists
   tags: join
 
 - name: Join Worker Node to Cluster
-  shell: /tmp/join-command.sh
+  ansible.builtin.shell: /tmp/join-command.sh
   when: not kubelet_exists.stat.exists
   register: join
   tags: join
 
 - name: Check if Worker Node joined to Cluster
-  debug:
+  ansible.builtin.debug:
     var: join.stdout_lines
   when: join is changed
   tags: join
 
 - name: Delete join command
-  file:
+  ansible.builtin.file:
     path: /tmp/join-command.sh
     state: absent
   tags: cleanup
 
 - name: Wait for kubelet to be ready
-  systemd:
+  ansible.builtin.systemd:
     name: kubelet
     state: started
   tags: verify
 
 - name: Display worker node success message
-  debug:
+  ansible.builtin.debug:
     msg: "Worker node successfully joined the cluster"
   when: join is changed
   tags: verify
 
 - name: Get cluster nodes status
   become: no
-  shell: kubectl get nodes
+  ansible.builtin.shell: kubectl get nodes
   environment:
     KUBECONFIG: /home/ubuntu/.kube/config
   delegate_to: "{{ groups['master'][0] }}"
@@ -62,6 +62,6 @@
   tags: verify
 
 - name: Show all cluster nodes
-  debug:
+  ansible.builtin.debug:
     var: cluster_nodes.stdout_lines
   tags: verify

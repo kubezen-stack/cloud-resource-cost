@@ -1,5 +1,5 @@
 - name: Install AWS CLI dependencies
-  apt:
+  ansible.builtin.apt:
     name:
       - unzip
       - curl
@@ -7,30 +7,30 @@
   tags: install
 
 - name: Download AWS CLI
-  get_url:
+  ansible.builtin.get_url:
     url: "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip"
     dest: "/tmp/awscliv2.zip"
     mode: "0644"
   tags: install
 
 - name: Unzip AWS CLI
-  unarchive:
+  ansible.builtin.unarchive:
     src: /tmp/awscliv2.zip
     dest: /tmp
     remote_src: yes
   tags: install
 
 - name: Install AWS CLI
-  shell: /tmp/aws/install --update
+  ansible.builtin.shell: /tmp/aws/install --update
   tags: install
 
 - name: Verify AWS CLI
-  command: aws --version
+  ansible.builtin.command: aws --version
   changed_when: false
   tags: install
 
 - name: Install Terraform dependencies
-  apt:
+  ansible.builtin.apt:
     name:
       - gnupg
       - software-properties-common
@@ -38,37 +38,37 @@
   tags: terraform
 
 - name: Add HashiCorp GPG key
-  apt_key:
+  ansible.builtin.apt_key:
     url: https://apt.releases.hashicorp.com/gpg
     state: present
   tags: terraform
 
 - name: Add HashiCorp repository
-  apt_repository:
+  ansible.builtin.apt_repository:
     repo: "deb [arch=amd64] https://apt.releases.hashicorp.com {{ ansible_distribution_release }} main"
     state: present
     update_cache: yes
   tags: terraform
 
 - name: Install Terraform
-  apt:
+  ansible.builtin.apt:
     name: "terraform"
     state: present
   tags: terraform
 
 - name: Verify Terraform
-  command: terraform version
+  ansible.builtin.command: terraform version
   changed_when: false
   tags: terraform
 
 - name: Check if runner is already configured
-  stat:
+  ansible.builtin.stat:
     path: /home/ubuntu/actions-runner/.runner
   register: runner_configured
   tags: install
 
 - name: Create runner directory
-  file:
+  ansible.builtin.file:
     path: /home/ubuntu/actions-runner
     state: directory
     owner: ubuntu
@@ -77,7 +77,7 @@
   tags: install
 
 - name: Download GitHub Actions runner
-  get_url:
+  ansible.builtin.get_url:
     url: "https://github.com/actions/runner/releases/download/v{{ runner_version }}/actions-runner-linux-x64-{{ runner_version }}.tar.gz"
     dest: "/tmp/actions-runner.tar.gz"
     mode: "0644"
@@ -85,7 +85,7 @@
   tags: install
 
 - name: Extract runner archive
-  unarchive:
+  ansible.builtin.unarchive:
     src: /tmp/actions-runner.tar.gz
     dest: /home/ubuntu/actions-runner
     remote_src: yes
@@ -95,7 +95,7 @@
   tags: install
 
 - name: Get runner registration token from GitHub API
-  uri:
+  ansible.builtin.uri:
     url: "https://api.github.com/repos/{{ github_org }}/{{ github_repo }}/actions/runners/registration-token"
     method: POST
     headers:
@@ -109,12 +109,12 @@
 
 - name: Configure runner
   become: no
-  shell: |
+  ansible.builtin.shell: |
     ./config.sh \
       --url https://github.com/{{ github_org }}/{{ github_repo }} \
       --token {{ runner_token_response.json.token }} \
       --name {{ runner_name }} \
-      --labels self-hosted,linux,x64,{{ environment }} \
+      --labels self-hosted,linux,x64,{{ target_env }} \
       --work _work \
       --unattended
   args:
@@ -123,21 +123,21 @@
   tags: install
 
 - name: Install runner as systemd service
-  shell: ./svc.sh install ubuntu
+  ansible.builtin.shell: ./svc.sh install ubuntu
   args:
     chdir: /home/ubuntu/actions-runner
   when: not runner_configured.stat.exists
   tags: install
 
 - name: Start runner service
-  shell: ./svc.sh start
+  ansible.builtin.shell: ./svc.sh start
   args:
     chdir: /home/ubuntu/actions-runner
   when: not runner_configured.stat.exists
   tags: install
 
 - name: Verify runner is active
-  shell: ./svc.sh status
+  ansible.builtin.shell: ./svc.sh status
   args:
     chdir: /home/ubuntu/actions-runner
   register: runner_status
@@ -145,6 +145,6 @@
   tags: verify
 
 - name: Display runner status
-  debug:
+  ansible.builtin.debug:
     var: runner_status.stdout_lines
   tags: verify

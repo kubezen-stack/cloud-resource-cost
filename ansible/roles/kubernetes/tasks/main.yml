@@ -1,41 +1,41 @@
 - name: Add Docker gpg key
-  apt_key:
+  ansible.builtin.apt_key:
     url: https://download.docker.com/linux/ubuntu/gpg
     state: present
   tags: containerd
 
 - name: Add Docker repository
-  apt_repository:
+  ansible.builtin.apt_repository:
     repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable
     state: present
     update_cache: yes
   tags: containerd
 
 - name: Install containerd
-  apt:
+  ansible.builtin.apt:
     name: containerd.io
     state: present
   tags: containerd
 
 - name: Create containerd config directory
-  file:
+  ansible.builtin.file:
     path: /etc/containerd
     state: directory
     mode: "0755"
   tags: containerd
 
 - name: Remove old containerd config if exists
-  file:
+  ansible.builtin.file:
     path: /etc/containerd/config.toml
     state: absent
   tags: containerd
 
 - name: Generate default containerd config
-  shell: containerd config default > /etc/containerd/config.toml
+  ansible.builtin.shell: containerd config default > /etc/containerd/config.toml
   tags: containerd
 
 - name: Configure containerd (SystemdCgroup and config_path)
-  lineinfile:
+  ansible.builtin.lineinfile:
     path: /etc/containerd/config.toml
     regexp: "{{ item.regexp }}"
     line: "{{ item.line }}"
@@ -46,9 +46,9 @@
   tags: containerd
 
 - name: Get ECR registry URL
-  shell: |
+  ansible.builtin.shell: |
     aws ecr describe-repositories \
-      --repository-names "cost-optimizer-{{ environment }}" \
+      --repository-names "cost-optimizer-{{ target_env }}" \
       --query "repositories[0].repositoryUri" \
       --output text | cut -d'/' -f1
   register: ecr_registry_url
@@ -56,20 +56,20 @@
   tags: containerd
 
 - name: Install amazon-ecr-credential-helper
-  apt:
+  ansible.builtin.apt:
     name: amazon-ecr-credential-helper
     state: present
   tags: containerd
 
 - name: Create docker config directory for root
-  file:
+  ansible.builtin.file:
     path: /root/.docker
     state: directory
     mode: "0755"
   tags: containerd
 
 - name: Create docker config directory for ubuntu
-  file:
+  ansible.builtin.file:
     path: /home/ubuntu/.docker
     state: directory
     owner: ubuntu
@@ -78,7 +78,7 @@
   tags: containerd
 
 - name: Configure ECR credential helper (root & ubuntu)
-  copy:
+  ansible.builtin.copy:
     dest: "{{ item }}/config.json"
     content: |
       {
@@ -93,12 +93,12 @@
   tags: containerd
 
 - name: Create ECR registry directory and hosts.toml
-  block:
-    - file:
+  ansible.builtin.block:
+    - ansible.builtin.file:
         path: "/etc/containerd/certs.d/{{ ecr_registry_url.stdout }}"
         state: directory
         mode: "0755"
-    - copy:
+    - ansible.builtin.copy:
         dest: "/etc/containerd/certs.d/{{ ecr_registry_url.stdout }}/hosts.toml"
         content: |
           server = "https://{{ ecr_registry_url.stdout }}"
@@ -108,7 +108,7 @@
   tags: containerd
 
 - name: Ensure CRI plugin is not disabled
-  lineinfile:
+  ansible.builtin.lineinfile:
     path: /etc/containerd/config.toml
     regexp: '^disabled_plugins\s*='
     line: 'disabled_plugins = []'
@@ -116,14 +116,14 @@
   tags: containerd
 
 - name: Create directory for Kubernetes
-  file:
+  ansible.builtin.file:
     path: /etc/apt/keyrings
     state: directory
     mode: "0755"
   tags: k8s_packages
 
 - name: Add Kubernetes GPG key
-  shell: |
+  ansible.builtin.shell: |
     curl -fsSL https://pkgs.k8s.io/core:/stable:/v{{ kubernetes_version }}/deb/Release.key | \
     gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
   args:
@@ -131,14 +131,14 @@
   tags: k8s_packages
 
 - name: Add Kubernetes repository
-  apt_repository:
+  ansible.builtin.apt_repository:
     repo: "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v{{ kubernetes_version }}/deb/ /"
     state: present
     update_cache: yes
   tags: k8s_packages
 
 - name: Install kubeadm, kubelet and kubectl
-  apt:
+  ansible.builtin.apt:
     name:
       - kubeadm
       - kubelet
@@ -149,7 +149,7 @@
   tags: k8s_packages
 
 - name: Hold kubeadm, kubelet and kubectl
-  dpkg_selections:
+  community.general.dpkg_selections:
     name: "{{ item }}"
     selection: hold
   loop:
@@ -159,25 +159,25 @@
   tags: k8s_packages
 
 - name: Enable kubelet service (will start after kubeadm init)
-  systemd:
+  ansible.builtin.systemd:
     name: kubelet
     enabled: yes
     daemon_reload: yes
   tags: k8s_packages
 
 - name: Flush all handlers to restart services
-  meta: flush_handlers
+  ansible.builtin.meta: flush_handlers
   tags: verify
 
 - name: Wait for services to stabilize
-  wait_for:
+  ansible.builtin.wait_for:
     timeout: 10
   delegate_to: localhost
   become: no
   tags: verify
 
 - name: Verify containerd is running (final check)
-  systemd:
+  ansible.builtin.systemd:
     name: containerd
     state: started
   register: containerd_status
@@ -185,7 +185,7 @@
   tags: verify
 
 - name: Display containerd status
-  debug:
+  ansible.builtin.debug:
     msg: "Containerd status: {{ containerd_status.status.ActiveState | default('unknown') }}"
   when: containerd_status is defined
   tags: verify

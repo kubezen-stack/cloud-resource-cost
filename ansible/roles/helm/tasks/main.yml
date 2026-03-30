@@ -1,25 +1,25 @@
 - name: Check if Helm is already installed
-  command: which helm
+  ansible.builtin.command: which helm
   register: helm_exists
   ignore_errors: true
   changed_when: false
   tags: install
 
 - name: Download Helm installation script
-  get_url:
+  ansible.builtin.get_url:
     url: https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
     dest: /tmp/get_helm.sh
-    mode: 0700
+    mode: '0700'
   when: helm_exists.rc != 0
   tags: install
 
 - name: Run Helm installation script
-  shell: /tmp/get_helm.sh
+  ansible.builtin.shell: /tmp/get_helm.sh
   when: helm_exists.rc != 0
   tags: install
 
 - name: Delete installation script
-  file:
+  ansible.builtin.file:
     path: /tmp/get_helm.sh
     state: absent
   tags: cleanup
@@ -49,7 +49,7 @@
         namespace: cost-optimizer
       type: kubernetes.io/dockerconfigjson
       data:
-        .dockerconfigjson: "{{ { 'auths': { (ecr_auth.url | regex_replace('^https://', '')): { 'auth': ( 'AWS:' + ecr_auth.password ) | b64encode } } } | to_json | b64encode }}"
+        .dockerconfigjson: "{{ { 'auths': { (ecr_auth.url | ansible.builtin.regex_replace('^https://', '')): { 'auth': ( 'AWS:' + ecr_auth.password ) | ansible.builtin.b64encode } } } | ansible.builtin.to_json | ansible.builtin.b64encode }}"
   tags: ecr_secret
 
 - name: Add Helm repositories
@@ -62,15 +62,12 @@
   loop:
     - { name: "bitnami", url: "https://charts.bitnami.com/bitnami" }
     - { name: "jetstack", url: "https://charts.jetstack.io" }
-    - {
-        name: "ingress-nginx",
-        url: "https://kubernetes.github.io/ingress-nginx",
-      }
+    - { name: "ingress-nginx", url: "https://kubernetes.github.io/ingress-nginx" }
   tags: repos
 
 - name: Update Helm repositories
   become: no
-  command: helm repo update
+  ansible.builtin.command: helm repo update
   environment:
     KUBECONFIG: /home/ubuntu/.kube/config
   changed_when: false
@@ -78,7 +75,7 @@
 
 - name: Verify Helm can communicate with Kubernetes
   become: no
-  command: helm list -A
+  ansible.builtin.command: helm list -A
   environment:
     KUBECONFIG: /home/ubuntu/.kube/config
   register: helm_list
@@ -93,16 +90,16 @@
     release_namespace: cost-optimizer
     values_files:
       - values.yaml
-      - "values-{{ environment }}.yaml"
+      - "values-{{ target_env }}.yaml"
     values:
       image:
-        repository: "{{ ecr_auth.url | regex_replace('^https://', '') }}/cost-optimizer-{{ environment }}"
+        repository: "{{ ecr_auth.url | ansible.builtin.regex_replace('^https://', '') }}/cost-optimizer-{{ target_env }}"
   environment:
     KUBECONFIG: /home/ubuntu/.kube/config
   tags: deploy
 
 - name: Display Helm test connection
-  debug:
+  ansible.builtin.debug:
     msg: "Helm successfully configured and connected to Kubernetes"
   when: helm_list.rc == 0
   tags: verify
