@@ -1,3 +1,31 @@
+- name: Check if AWS CLI is installed
+  ansible.builtin.command: which aws
+  register: aws_cli_check
+  ignore_errors: true
+  changed_when: false
+  tags: ecr_secret
+
+- name: Download AWS CLI
+  ansible.builtin.get_url:
+    url: "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip"
+    dest: "/tmp/awscliv2.zip"
+    mode: "0644"
+  when: aws_cli_check.rc != 0
+  tags: ecr_secret
+
+- name: Unzip AWS CLI
+  ansible.builtin.unarchive:
+    src: /tmp/awscliv2.zip
+    dest: /tmp
+    remote_src: yes
+  when: aws_cli_check.rc != 0
+  tags: ecr_secret
+
+- name: Install AWS CLI
+  ansible.builtin.shell: /tmp/aws/install --update
+  when: aws_cli_check.rc != 0
+  tags: ecr_secret
+
 - name: Check if Helm is already installed
   ansible.builtin.command: which helm
   register: helm_exists
