@@ -48,6 +48,10 @@ database:
 
 postgresql:
   enabled: true
+  image:
+    registry: "public.ecr.aws"
+    repository: "bitnami/postgresql"
+    tag: "latest"
   auth:
     username: dbadmin
     database: cost_optimizer_dev
