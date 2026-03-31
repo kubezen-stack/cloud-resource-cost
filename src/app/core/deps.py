@@ -1,6 +1,6 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from sqlalchemy import select
+from sqlalchemy import UUID, select
 from jose import JWTError, jwt
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.user import User
@@ -19,7 +19,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Could not validate credentials")
     
     result = await db.execute(
-        select(User).where(User.id == user_id)
+        select(User).where(User.id == UUID(user_id))
     )
 
     user = result.scalar_one_or_none()
