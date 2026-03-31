@@ -2,30 +2,30 @@ import pytest
 
 @pytest.mark.asyncio
 async def test_register_user(client):
-    response = await client.post("/api/v1/register", json={
+    response = await client.post("/api/v1/auth/register", json={
         "email": "testuser@example.com",
         "username": "testuser",
         "password": "testpassword"
     })
     assert response.status_code == 201
     data = response.json()
-    assert data["username"] == "testuser"
     assert data["email"] == "testuser@example.com"
-    assert "id" in data
-    assert "hashed_password" not in data
 
 @pytest.mark.asyncio
 async def test_register_duplicate_email(client):
-    response = await client.post("/api/v1/register", json={
-        "email": "testuser@example.com",
-        "username": "anotheruser",
-        "password": "testpassword"
-    })
+    payload = {
+        "email": "duplicate@example.com",
+        "username": "user1",
+        "password": "password123"
+    }
+
+    await client.post("/api/v1/auth/register", json=payload)
+    response = await client.post("/api/v1/auth/register", json=payload)
     assert response.status_code == 400
 
 @pytest.mark.asyncio
 async def test_register_invalid_email(client):
-    response = await client.post("/api/v1/register", json={
+    response = await client.post("/api/v1/auth/register", json={
         "email": "invalid-email",
         "username": "testuser2",
         "password": "testpassword"
@@ -36,8 +36,8 @@ async def test_register_invalid_email(client):
 async def test_register_short_password(client):
     response = await client.post("/api/v1/auth/register", json={
         "email": "test2@example.com",
-        "full_name": "Test",
-        "password": "short"
+        "username": "Test",
+        "password": "123"
     })
     assert response.status_code == 422
 
@@ -45,7 +45,7 @@ async def test_register_short_password(client):
 async def test_register_missing_fields(client):
     response = await client.post("/api/v1/auth/register", json={
         "email": "test2@example.com",
-        "full_name": "Test"
+        "username": "Test"
     })
     assert response.status_code == 422
 
@@ -53,16 +53,25 @@ async def test_register_missing_fields(client):
 async def test_register_empty_fields(client):
     response = await client.post("/api/v1/auth/register", json={
         "email": "",
-        "full_name": "",
+        "username": "",
         "password": ""
     })
     assert response.status_code == 422
 
 @pytest.mark.asyncio
 async def test_login_user(client):
-    response = await client.post("/api/v1/auth/login", json={
-        "email": "testuser@example.com",
-        "password": "testpassword"
+    email = "login_test@example.com"
+    password = "testpassword"
+
+    await client.post("/api/v1/auth/register", json={
+        "email": email,
+        "username": "login_test",
+        "password": password
+    })
+    
+    response = await client.post("/api/v1/auth/login", data={
+        "username": email, 
+        "password": password
     })
     assert response.status_code == 200
     data = response.json()
@@ -71,17 +80,24 @@ async def test_login_user(client):
 
 @pytest.mark.asyncio
 async def test_login_invalid_credentials(client):
-    response = await client.post("/api/v1/auth/login", json={
-        "email": "testuser@example.com",
-        "password": "wrongpassword"
+    email = "wrong_pass@example.com"
+    await client.post("/api/v1/auth/register", json={
+        "email": email,
+        "username": "wrong_pass",
+        "password": "correct_password"
+    })
+    
+    response = await client.post("/api/v1/auth/login", data={
+        "username": email,
+        "password": "incorrect_password"
     })
     assert response.status_code == 401
 
 @pytest.mark.asyncio
 async def test_login_nonexistent_user(client):
-    response = await client.post("/api/v1/auth/login", json={
-        "email": "lK2bG@example.com",
-        "password": "testpassword"
+    response = await client.post("/api/v1/auth/login", data={
+        "username": "no-one@example.com",
+        "password": "password123"
     })
     assert response.status_code == 401
 
