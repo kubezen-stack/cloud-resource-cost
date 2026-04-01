@@ -80,12 +80,18 @@ jobs:
           fi
           echo "TAG=${TAG}" >> $GITHUB_OUTPUT
 
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Build Docker Image
         run: |
-          docker build \
+          docker buildx build \
+          --cache-from type=gha \
+          --cache-to type=gha,mode=max \
           -f docker/Dockerfile \
           -t ${{ steps.tf_outputs.outputs.ecr_url }}:${{ steps.image_tag.outputs.TAG }} \
           -t ${{ steps.tf_outputs.outputs.ecr_url }}:${{ env.ENVIRONMENT }} \
+          --load \
           .
 
       - name: Push Docker Image

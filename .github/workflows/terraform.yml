@@ -63,8 +63,20 @@ jobs:
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
+      - name: Cache Terraform plugins
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.terraform.d/plugin-cache
+            ${{ env.WORKING_DIR }}/.terraform
+          key: terraform-${{ env.TARGET_ENV }}-${{ hashFiles('**/.terraform.lock.hcl') }}
+          restore-keys: |
+            terraform-${{ env.TARGET_ENV }}-
+
       - name: Terraform Init
         run: terraform init
+        env:
+          TF_PLUGIN_CACHE_DIR: ~/.terraform.d/plugin-cache
 
       - name: Terraform format
         run: terraform fmt -check -recursive
