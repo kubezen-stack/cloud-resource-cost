@@ -1,0 +1,160 @@
+victoriametrics:
+  enabled: true
+  server:
+    retentionPeriod: 14d
+    persistentVolume:
+      enabled: true
+      size: 20Gi
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 250m
+        memory: 256Mi
+
+vmagent:
+  enabled: true
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  remoteWrite:
+    - url: "http://monitoring-victoria-metrics-single:8428/api/v1/write"
+
+loki:
+  enabled: true
+  deploymentMode: SingleBinary
+  backend:
+    replicas: 0
+  read:
+    replicas: 0
+  write:
+    replicas: 0
+  loki:
+    auth_enabled: false
+    commonConfig:
+      replication_factor: 1
+    storage:
+      type: "filesystem"
+    schemaConfig:
+      configs:
+        - from: "2025-01-01"
+          store: tsdb
+          object_store: filesystem
+          schema: v13
+          index:
+            prefix: index_
+            period: 24h
+  singleBinary:
+    replicas: 1
+    persistence:
+      enabled: false
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 250m
+        memory: 256Mi
+
+promtail:
+  enabled: true
+  config:
+    clients:
+      - url: "http://monitoring-loki:3100/loki/api/v1/push"
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+grafana:
+  enabled: true
+  adminPassword: "admin"
+  service:
+    type: NodePort
+  persistence:
+    enabled: false
+  additionalDataSources:
+    - name: "VictoriaMetrics"
+      type: "prometheus"
+      url: "http://monitoring-victoria-metrics-single:8428"
+      isDefault: true
+    - name: "Loki"
+      type: "loki"
+      url: "http://monitoring-loki:3100"
+  dashboards:
+    default:
+      node-exporter:
+        gnetId: 1860
+        revisionId: 37
+        datasource: "VictoriaMetrics"
+      kubernetes:
+        gnetId: 315
+        revisionId: 3
+        datasource: "VictoriaMetrics"
+  dashboardProviders:
+    default:
+      apiVersion: 1
+      providers:
+        - name: 'default'
+          orgId: 1
+          folder: ''
+          type: file
+          disableDeletion: false
+          editable: true
+          options:
+            path: '/var/lib/grafana/dashboards/default'
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 250m
+      memory: 256Mi
+
+prometheus-node-exporter:
+  enabled: true
+  prometheus:
+    monitor:
+      enabled: true
+  resources:
+    limits:
+      cpu: 200m
+      memory: 128Mi
+    requests:
+      cpu: 100m
+      memory: 64Mi
+  tolerations: 
+    - key: node-role.kubernetes.io/control-plane 
+      operator: Exists 
+      effect: NoSchedule
+
+alertmanager:
+  enabled: true
+  config:
+    global:
+      resolve_timeout: 5m
+    route:
+      group_by: ["alertname"]
+      group_wait: 10s
+      group_interval: 10m
+      repeat_interval: 1h
+      receiver: "null"
+    receivers:
+      - name: "null"
+  persistence:
+    enabled: false
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi

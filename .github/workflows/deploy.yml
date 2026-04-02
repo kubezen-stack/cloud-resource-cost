@@ -180,3 +180,55 @@ jobs:
           --create-namespace \
           --timeout 600s \
           --wait
+
+  helm-deploy-monitoring-dev:
+    name: "Helm Deploy Monitoring(dev)"
+    runs-on: "self-hosted"
+    environment: "${{ github.event.inputs.environment || 'dev' }}"
+    needs: build-and-push
+    if: ${{ github.event.inputs.environment == 'dev' || github.event_name == 'push' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Get kubeconfig from Secrets Manager
+        run: |
+          KUBECONFIG_DATA=$(aws secretsmanager get-secret-value \
+            --secret-id "cost-optimizer-dev-kubeconfig" \
+            --query SecretString \
+            --output text)
+          mkdir -p ~/.kube
+          echo "$KUBECONFIG_DATA" > ~/.kube/config
+          chmod 600 ~/.kube/config
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: "v3.14.0"
+
+      - name: Helm install dependencies
+        run: |
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+          helm repo add victoriametrics https://victoriametrics.github.io/helm-charts
+          helm repo add grafana https://grafana.github.io/helm-charts
+          helm repo update
+
+      - name: Helm update monitoring dependencies
+        run: helm dependency update ./helm/monitoring
+
+      - name: Helm deploy monitoring
+        run: |
+          helm upgrade --install monitoring ./helm/monitoring \
+          -f ./helm/monitoring/values-dev.yaml \
+          --namespace monitoring \
+          --create-namespace \
+          --timeout 600s \
+          --wait

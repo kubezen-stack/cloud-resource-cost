@@ -1,0 +1,24 @@
+dependencies:
+- name: victoria-metrics-single
+  repository: https://victoriametrics.github.io/helm-charts
+  version: 0.11.2
+- name: victoria-metrics-agent
+  repository: https://victoriametrics.github.io/helm-charts
+  version: 0.10.14
+- name: promtail
+  repository: https://grafana.github.io/helm-charts
+  version: 6.17.1
+- name: loki
+  repository: https://grafana.github.io/helm-charts
+  version: 6.55.0
+- name: grafana
+  repository: https://grafana.github.io/helm-charts
+  version: 8.15.0
+- name: alertmanager
+  repository: https://prometheus-community.github.io/helm-charts
+  version: 1.34.0
+- name: prometheus-node-exporter
+  repository: https://prometheus-community.github.io/helm-charts
+  version: 4.52.2
+digest: sha256:f7c17b55c2749d92b74c21b1a024fe829f6ef3c656d944d104ed1cafa4c1ca73
+generated: "2026-04-02T01:58:04.944367+03:00"

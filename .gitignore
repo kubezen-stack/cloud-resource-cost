@@ -48,4 +48,8 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+charts/*.tgz
+charts/
+!charts/.gitkeep
+.helm/
 MANIFEST
