@@ -99,6 +99,66 @@ jobs:
           docker push ${{ steps.tf_outputs.outputs.ecr_url }}:${{ steps.image_tag.outputs.TAG }}
           docker push ${{ steps.tf_outputs.outputs.ecr_url }}:${{ env.ENVIRONMENT }}
 
+  run-tests:
+    name: "Run Tests"
+    runs-on: "self-hosted"
+    environment: "${{ github.event.inputs.environment || 'dev' }}"
+    needs: helm-deploy-dev
+    if: ${{ github.event.inputs.environment == 'dev' || github.event_name == 'push' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Get kubeconfig from Secrets Manager
+        run: |
+          KUBECONFIG_DATA=$(aws secretsmanager get-secret-value \
+            --secret-id "cost-optimizer-dev-kubeconfig" \
+            --query SecretString \
+            --output text)
+          mkdir -p ~/.kube
+          echo "$KUBECONFIG_DATA" > ~/.kube/config
+          chmod 600 ~/.kube/config
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install test dependencies
+        run: |
+          cd src
+          pip install -r requirements.txt
+
+      - name: Wait for app to be ready
+        run: |
+          kubectl wait --for=condition=ready pod \
+            -l app.kubernetes.io/name=cost-optimizer \
+            -n cost-optimizer \
+            --timeout=120s
+
+      - name: Run unit tests
+        run: |
+          cd src
+          pytest tests/unit/ -v
+
+      - name: Run integration tests
+        run: |
+          cd src
+          pytest tests/integration/ -v
+
+      - name: Run smoke tests
+        run: |
+          cd src
+          pytest tests/smoke/ -v
+
   helm-deploy-dev:
     name: "Helm Deploy(dev)"
     runs-on: "self-hosted"
