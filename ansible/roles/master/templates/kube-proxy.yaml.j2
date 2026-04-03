@@ -90,7 +90,7 @@ spec:
             - v=2
           securityContext:
             privileged: true
-          VolumeMounts:
+          volumeMounts:
             - mountPath: /var/lib/kube-proxy
               name: kube-proxy
             - mountPath: /run/xtables.lock

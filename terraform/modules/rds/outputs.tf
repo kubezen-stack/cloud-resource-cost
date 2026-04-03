@@ -31,6 +31,7 @@ output "db_username" {
 output "db_url_connection_string" {
   description = "The connection string for the database (useful for application configuration)."
   value       = "postgres://${var.db_username}:${random_password.db_password.result}@${aws_db_instance.main.address}:${aws_db_instance.main.port}/${local.database-name}"
+  sensitive   = true
 }
 
 output "master_secret_name" {
@@ -53,4 +54,5 @@ output "rds_summary" {
     "username" = var.db_username
     "url_connection_string" = "postgres://${var.db_username}:${random_password.db_password.result}@${aws_db_instance.main.address}:${aws_db_instance.main.port}/${local.database-name}"
   }
+  sensitive = true
 }

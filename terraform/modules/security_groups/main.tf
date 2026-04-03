@@ -183,7 +183,7 @@ resource "aws_security_group" "redis" {
 }
 
 resource "aws_security_group_rule" "redis_access" {
-  count           = var.environment == "prod" ? 1 : 0
+  count             = var.environment == "prod" ? 1 : 0
   type              = "ingress"
   from_port         = 6379
   to_port           = 6379
@@ -209,7 +209,7 @@ resource "aws_security_group" "alb" {
 }
 
 resource "aws_security_group_rule" "alb_http" {
-    count            = var.environment == "prod" ? 1 : 0
+    count             = var.environment == "prod" ? 1 : 0
     type              = "ingress"
     from_port         = 80
     to_port           = 80
@@ -221,7 +221,7 @@ resource "aws_security_group_rule" "alb_http" {
 }
 
 resource "aws_security_group_rule" "alb_https" {
-    count            = var.environment == "prod" ? 1 : 0
+    count             = var.environment == "prod" ? 1 : 0
     type              = "ingress"
     from_port         = 443
     to_port           = 443
@@ -233,15 +233,14 @@ resource "aws_security_group_rule" "alb_https" {
 }
 
 resource "aws_security_group_rule" "alb_all_egress" {
-  count            = var.environment == "prod" ? 1 : 0
-  type              = "egress"
-  from_port         = 0
-  to_port           = 0
-  protocol          = "-1"
-  source_security_group_id = aws_security_group.ec2_sg_id.id
-  security_group_id = aws_security_group.alb[0].id
-  cidr_blocks       = var.ssh_access_cidr
-  description       = "Allow all outbound traffic"
+  count                    = var.environment == "prod" ? 1 : 0
+  type                     = "egress"
+  from_port                = 0
+  to_port                  = 0
+  protocol                 = "-1"
+  security_group_id        = aws_security_group.alb[0].id
+  cidr_blocks              = var.ssh_access_cidr
+  description              = "Allow all outbound traffic"
 }
 
 resource "aws_security_group_rule" "alb_to_ec2" {

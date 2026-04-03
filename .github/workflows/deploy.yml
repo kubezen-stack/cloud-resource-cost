@@ -37,6 +37,7 @@ jobs:
     environment: "${{ github.event.inputs.environment || 'dev' }}"
     outputs:
       image_tag: ${{ steps.image_tag.outputs.TAG }}
+      ecr_url: ${{ steps.tf_outputs.outputs.ecr_url }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -180,11 +181,7 @@ jobs:
       - name: Get ECR URL from terraform
         id: ecr
         run: |
-          cd terraform/environments/${{ env.ENVIRONMENT }}
-          terraform init -reconfigure
-          ECR_URL=$(terraform output -raw ecr_repository_url)
-          echo "ECR_URL is: ${ECR_URL}"
-          echo "ecr_url=${ECR_URL}" >> $GITHUB_OUTPUT
+          echo "ecr_url=${{ needs.build-and-push.outputs.ecr_url }}" >> $GITHUB_OUTPUT
 
       - name: Get kubeconfig from Secrets Manager
         run: |
