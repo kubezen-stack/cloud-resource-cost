@@ -23,7 +23,12 @@ victoria-metrics-agent:
       cpu: 100m
       memory: 128Mi
   remoteWrite:
-    - url: "http://monitoring-victoria-metrics-single:8428/api/v1/write"
+    - url: "http://monitoring-victoria-metrics-single-server:8428/api/v1/write"
+  config:
+    global:
+      scrape_interval: 10s
+      external_labels:
+        env: "prod"
 
 loki:
   enabled: true
@@ -38,6 +43,9 @@ loki:
     auth_enabled: false
     commonConfig:
       replication_factor: 1
+      path_prefix: /tmp/loki
+    compactor:
+      working_directory: /tmp/loki/compactor
     storage:
       type: "filesystem"
     schemaConfig:
@@ -84,7 +92,7 @@ grafana:
   additionalDataSources:
     - name: "VictoriaMetrics"
       type: "prometheus"
-      url: "http://monitoring-victoria-metrics-single:8428"
+      url: "http://monitoring-victoria-metrics-single-server:8428"
       isDefault: true
     - name: "Loki"
       type: "loki"

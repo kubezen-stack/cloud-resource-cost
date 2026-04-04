@@ -50,6 +50,10 @@ loki:
       path_prefix: /tmp/loki
     compactor:
       working_directory: /tmp/loki/compactor
+    storage_config:
+      filesystem:
+        chunks_directory: /tmp/loki/chunks
+        rules_directory: /tmp/loki/rules
     storage:
       type: "filesystem"
     rulerConfig:
@@ -134,3 +138,26 @@ prometheus-node-exporter:
     - key: node-role.kubernetes.io/control-plane
       operator: Exists
       effect: NoSchedule
+
+resources:
+  main:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  migration:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 300m
+      memory: 256Mi
+  tests:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
