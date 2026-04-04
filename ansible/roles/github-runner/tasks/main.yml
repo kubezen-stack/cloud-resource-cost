@@ -10,7 +10,7 @@
   ansible.builtin.get_url:
     url: "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip"
     dest: "/tmp/awscliv2.zip"
-    mode: "0600"
+    mode: "0644"
   tags: install
 
 - name: Unzip AWS CLI
@@ -80,7 +80,7 @@
   ansible.builtin.get_url:
     url: "https://github.com/actions/runner/releases/download/v{{ runner_version }}/actions-runner-linux-x64-{{ runner_version }}.tar.gz"
     dest: "/tmp/actions-runner.tar.gz"
-    mode: "0600"
+    mode: "0644"
   when: not runner_configured.stat.exists
   tags: install
 

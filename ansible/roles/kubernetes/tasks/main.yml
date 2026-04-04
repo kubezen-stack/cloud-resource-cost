@@ -36,7 +36,7 @@
   ansible.builtin.file:
     path: /etc/containerd
     state: directory
-    mode: "0750"
+    mode: "0755"
   tags: containerd
 
 - name: Remove old containerd config if exists
@@ -80,7 +80,7 @@
   ansible.builtin.file:
     path: /root/.docker
     state: directory
-    mode: "0750"
+    mode: "0700"
   tags: containerd
 
 - name: Create docker config directory for ubuntu
@@ -89,7 +89,7 @@
     state: directory
     owner: ubuntu
     group: ubuntu
-    mode: "0750"
+    mode: "0700"
   tags: containerd
 
 - name: Configure ECR credential helper (root & ubuntu)
@@ -111,7 +111,7 @@
   ansible.builtin.file:
     path: "/etc/containerd/certs.d/{{ ecr_registry_url.stdout }}"
     state: directory
-    mode: "0750"
+    mode: "0755"
   notify: restarted containerd
   tags: containerd
 
