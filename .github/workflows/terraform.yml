@@ -92,7 +92,7 @@ jobs:
           -out=tfplan-${{ env.TARGET_ENV }}
 
       - name: Terraform Upload Plan
-        uses: actions/upload-artifact@c6a366c94c3e0affe28c06c8df20a878f24da3cf # v3.2.2
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: tfplan-${{ env.TARGET_ENV }}
           path: ${{ env.WORKING_DIR }}/tfplan-${{ env.TARGET_ENV }}
