@@ -123,7 +123,7 @@ prometheus-node-exporter:
   enabled: true
   prometheus:
     monitor:
-      enabled: true
+      enabled: false
   resources:
     limits:
       cpu: 200m
