@@ -12,7 +12,7 @@ victoria-metrics-single:
     persistentVolume:
       enabled: false
 
-vmagent:
+victoria-metrics-agent:
   enabled: true
   config:
     externalLabels:
@@ -24,8 +24,8 @@ vmagent:
     limits:
       cpu: 200m
       memory: 256Mi
-  extraArgs:
-    remoteWrite.url: "http://monitoring-victoria-metrics-single-server:8428/api/v1/write"
+  remoteWrite:
+    - url: "http://monitoring-victoria-metrics-single-server:8428/api/v1/write"
 
 loki:
   enabled: true
