@@ -11,13 +11,13 @@ spec:
   containers:
     - name: wget
       image: busybox:1.36
-      resourses:
+      resources:
         requests:
           cpu: {{ .Values.resources.tests.requests.cpu }}
-            memory: {{ .Values.resources.tests.requests.memory }}
-          limits:
-            cpu: {{ .Values.resources.tests.limits.cpu }}
-            memory: {{ .Values.resources.tests.limits.memory }}
+          memory: {{ .Values.resources.tests.requests.memory }}
+        limits:
+          cpu: {{ .Values.resources.tests.limits.cpu }}
+          memory: {{ .Values.resources.tests.limits.memory }}
       command: ['wget']
       args: ['{{ include "cost-optimizer.fullname" . }}:{{ .Values.service.port }}/health']
   restartPolicy: Never
