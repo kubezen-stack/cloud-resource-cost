@@ -1,7 +1,21 @@
+- name: Remove old Docker GPG key if exists
+  ansible.builtin.file:
+    path: /etc/apt/keyrings/docker.gpg
+    state: absent
+  tags: containerd
+
+- name: Remove old Docker repo list if exists  
+  ansible.builtin.file:
+    path: /etc/apt/sources.list.d/docker.list
+    state: absent
+  tags: containerd
+
 - name: Add Docker gpg key
-  ansible.builtin.apt_key:
-    url: https://download.docker.com/linux/ubuntu/gpg
-    state: present
+  ansible.builtin.shell: |
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \
+    gpg --dearmor | \
+    tee /etc/apt/keyrings/docker.gpg > /dev/null
+    chmod 644 /etc/apt/keyrings/docker.gpg
   tags: containerd
 
 - name: Add Docker repository
@@ -125,12 +139,24 @@
     mode: "0750"
   tags: k8s_packages
 
+- name: Remove old Kubernetes repo list if exists
+  ansible.builtin.file:
+    path: /etc/apt/sources.list.d/kubernetes.list
+    state: absent
+  tags: k8s_packages
+
+- name: Remove old Kubernetes GPG key if exists
+  ansible.builtin.file:
+    path: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+    state: absent
+  tags: k8s_packages
+
 - name: Add Kubernetes GPG key
   ansible.builtin.shell: |
     curl -fsSL https://pkgs.k8s.io/core:/stable:/v{{ kubernetes_version }}/deb/Release.key | \
-    gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
-  args:
-    creates: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+    gpg --dearmor | \
+    tee /etc/apt/keyrings/kubernetes-apt-keyring.gpg > /dev/null
+    chmod 644 /etc/apt/keyrings/kubernetes-apt-keyring.gpg
   tags: k8s_packages
 
 - name: Add Kubernetes repository
