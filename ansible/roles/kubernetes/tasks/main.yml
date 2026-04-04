@@ -92,9 +92,9 @@
     mode: "0700"
   tags: containerd
 
-- name: Configure ECR credential helper (root & ubuntu)
+- name: Configure ECR credential helper (root)
   ansible.builtin.copy:
-    dest: "{{ item }}/config.json"
+    dest: /root/.docker/config.json
     content: |
       {
         "credHelpers": {
@@ -102,9 +102,20 @@
         }
       }
     mode: "0600"
-  loop:
-    - "/root/.docker"
-    - "/home/ubuntu/.docker"
+  tags: containerd
+
+- name: Configure ECR credential helper (ubuntu)
+  ansible.builtin.copy:
+    dest: /home/ubuntu/.docker/config.json
+    content: |
+      {
+        "credHelpers": {
+          "{{ ecr_registry_url.stdout }}": "ecr-login"
+        }
+      }
+    owner: ubuntu
+    group: ubuntu
+    mode: "0600"
   tags: containerd
 
 - name: Create ECR registry directory
