@@ -56,6 +56,9 @@ loki:
         rules_directory: /tmp/loki/rules
     storage:
       type: "filesystem"
+      filesystem:
+        chunks_directory: /tmp/loki/chunks
+        rules_directory: /tmp/loki/rules
     rulerConfig:
       storage:
         type: local
