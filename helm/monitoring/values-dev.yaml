@@ -1,4 +1,4 @@
-victoriametrics:
+victoria-metrics-single:
   enabled: true
   server:
     retentionPeriod: 3d
