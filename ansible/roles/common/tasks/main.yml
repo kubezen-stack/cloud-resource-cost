@@ -1,3 +1,15 @@
+- name: Remove conflicting Docker repo list if exists
+  ansible.builtin.file:
+    path: /etc/apt/sources.list.d/docker.list
+    state: absent
+  tags: packages
+
+- name: Remove conflicting Docker GPG key if exists
+  ansible.builtin.file:
+    path: /etc/apt/keyrings/docker.gpg
+    state: absent
+  tags: packages
+
 - name: Update apt cache
   apt:
     update_cache: yes
