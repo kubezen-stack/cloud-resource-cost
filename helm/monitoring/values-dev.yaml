@@ -24,8 +24,8 @@ victoria-metrics-agent:
   config:
     global:
       scrape_interval: 10s
-    externalLabels:
-      env: "dev"
+      external_labels:
+        env: "dev"
   resources:
     requests:
       cpu: 50m

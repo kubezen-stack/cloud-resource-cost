@@ -222,7 +222,10 @@ jobs:
       - name: Get ECR URL from terraform
         id: ecr
         run: |
-          echo "ecr_url=${{ needs.build-and-push.outputs.ecr_url }}" >> $GITHUB_OUTPUT
+          cd terraform/environments/${{ env.ENVIRONMENT }}
+          terraform init
+          ECR_URL=$(terraform output -raw ecr_repository_url)
+          echo "ecr_url=${ECR_URL}" >> $GITHUB_OUTPUT
 
       - name: Get kubeconfig from Secrets Manager
         run: |
