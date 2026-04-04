@@ -21,7 +21,7 @@
   ansible.builtin.file:
     path: /etc/containerd
     state: directory
-    mode: "0755"
+    mode: "0750"
   tags: containerd
 
 - name: Remove old containerd config if exists
@@ -65,7 +65,7 @@
   ansible.builtin.file:
     path: /root/.docker
     state: directory
-    mode: "0755"
+    mode: "0750"
   tags: containerd
 
 - name: Create docker config directory for ubuntu
@@ -74,7 +74,7 @@
     state: directory
     owner: ubuntu
     group: ubuntu
-    mode: "0755"
+    mode: "0750"
   tags: containerd
 
 - name: Configure ECR credential helper (root & ubuntu)
@@ -86,7 +86,7 @@
           "{{ ecr_registry_url.stdout }}": "ecr-login"
         }
       }
-    mode: "0644"
+    mode: "0600"
   loop:
     - "/root/.docker"
     - "/home/ubuntu/.docker"
@@ -96,7 +96,7 @@
   ansible.builtin.file:
     path: "/etc/containerd/certs.d/{{ ecr_registry_url.stdout }}"
     state: directory
-    mode: "0755"
+    mode: "0750"
   notify: restarted containerd
   tags: containerd
 
@@ -122,7 +122,7 @@
   ansible.builtin.file:
     path: /etc/apt/keyrings
     state: directory
-    mode: "0755"
+    mode: "0750"
   tags: k8s_packages
 
 - name: Add Kubernetes GPG key

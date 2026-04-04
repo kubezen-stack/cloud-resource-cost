@@ -1,3 +1,4 @@
+from typing import Annotated
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi.responses import JSONResponse
@@ -8,7 +9,7 @@ from app.core.config import settings
 router = APIRouter()
 
 @router.get("/health")
-async def health_check(db: AsyncSession = Depends(get_db)):
+async def health_check(db: Annotated[AsyncSession, Depends(get_db)]):
     try:
         await db.execute(text("SELECT 1"))
         db_status = "healthy"
@@ -28,7 +29,7 @@ async def health_check(db: AsyncSession = Depends(get_db)):
     }
 
 @router.get("/ready")
-async def readiness_check(db: AsyncSession = Depends(get_db)):
+async def readiness_check(db: Annotated[AsyncSession, Depends(get_db)]):
     checks = {}
     is_ready = True
  

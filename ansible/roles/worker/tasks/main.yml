@@ -17,7 +17,7 @@
   ansible.builtin.copy:
     src: "{{ playbook_dir }}/join-command.sh"
     dest: /tmp/join-command.sh
-    mode: "0755"
+    mode: "0750"
   when: not kubelet_exists.stat.exists
   tags: join
 

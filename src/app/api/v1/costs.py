@@ -16,10 +16,10 @@ router = APIRouter()
 @router.get("/{account_id}/costs")
 async def get_account_costs(
     account_id: uuid_pkg.UUID,
-    start_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
-    end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
-    granularity: str = Query("DAILY", description="DAILY, MONTHLY, or HOURLY"),
-    group_by: Optional[str] = Query("SERVICE", description="SERVICE, REGION, INSTANCE_TYPE, etc."),
+    start_date: Annotated[Optional[str], Query(None, description="Start date (YYYY-MM-DD)")],
+    end_date: Annotated[Optional[str], Query(None, description="End date (YYYY-MM-DD)")],
+    granularity: Annotated[str, Query("DAILY", description="DAILY, MONTHLY, or HOURLY")],
+    group_by: Annotated[Optional[str], Query("SERVICE", description="SERVICE, REGION, INSTANCE_TYPE, etc.")],
     current_user: Annotated[User, Depends(get_current_user)] = None,
     db: Annotated[AsyncSession, Depends(get_db)] = None
 ):
@@ -81,8 +81,8 @@ async def get_account_costs(
 @router.get("/{account_id}/forecast")
 async def get_cost_forecast(
     account_id: uuid_pkg.UUID,
-    start_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
-    end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
+    start_date: Annotated[Optional[str], Query(None, description="Start date (YYYY-MM-DD)")],
+    end_date: Annotated[Optional[str], Query(None, description="End date (YYYY-MM-DD)")],
     current_user: Annotated[User, Depends(get_current_user)] = None,
     db: Annotated[AsyncSession, Depends(get_db)] = None
 ):
@@ -139,8 +139,8 @@ async def get_cost_forecast(
 @router.get("/{account_id}/breakdown")
 async def get_cost_breakdown(
     account_id: uuid_pkg.UUID,
-    start_date: Optional[str] = Query(None),
-    end_date: Optional[str] = Query(None),
+    start_date: Annotated[Optional[str], Query(None)],
+    end_date: Annotated[Optional[str], Query(None)],
     current_user: Annotated[User, Depends(get_current_user)] = None,
     db: Annotated[AsyncSession, Depends(get_db)] = None
 ):

@@ -10,7 +10,7 @@ from sqlalchemy import select
 
 router = APIRouter()
 
-@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED, responses={500: {"description": "Помилка при збереженні у базу"}})
 async def register(user_create: UserCreate, db: Annotated[AsyncSession, Depends(get_db)]):
     result = await db.execute(select(User).where(User.email == user_create.email))
     if result.scalar_one_or_none():

@@ -20,6 +20,7 @@ spec:
         component: migration
     spec:
       restartPolicy: Never
+      automountServiceAccountToken: false
       imagePullSecrets:
         {{- range .Values.imagePullSecrets }}
         - name: {{ .name }}
@@ -30,7 +31,14 @@ spec:
           command: ['sh', '-c', 'until nc -z {{ .Values.database.host }} {{ .Values.database.port }}; do echo "waiting for postgresql..."; sleep 5; done']
       containers:
         - name: alembic-migrate
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          resources:
+            requests:
+              cpu: {{ .Values.resources.migration.requests.cpu }}
+              memory: {{ .Values.resources.migration.requests.memory }}
+            limits:
+              cpu: {{ .Values.resources.migration.limits.cpu }}
+              memory: {{ .Values.resources.migration.limits.memory }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command: ["alembic", "upgrade", "head"]
           envFrom:

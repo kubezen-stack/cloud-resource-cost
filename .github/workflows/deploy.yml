@@ -41,17 +41,17 @@ jobs:
       ecr_url: ${{ steps.tf_outputs.outputs.ecr_url }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
+        uses: hashicorp/setup-terraform@5e8dbf3c6d9deaf4193ca7a8fb23f2ac83bb6c85 # v4.0.0
         with:
           terraform_version: ${{ env.TF_VERSION }}
           terraform_wrapper: false
@@ -70,7 +70,7 @@ jobs:
 
       - name: Login to ECR
         id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
+        uses: aws-actions/amazon-ecr-login@183a1442edf41672e66566b7fc560e297a290896 # v2.1.1
 
       - name: Set Image Tag
         id: image_tag
@@ -83,7 +83,7 @@ jobs:
           echo "TAG=${TAG}" >> $GITHUB_OUTPUT
 
       - name: Setup Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
       - name: Build Docker Image
         run: |
@@ -97,7 +97,7 @@ jobs:
           .
 
       - name: Run Trivy scanner
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
         with:
           image-ref: "${{ steps.tf_outputs.outputs.ecr_url }}:${{ steps.image_tag.outputs.TAG }}"
           format: 'json'
@@ -105,7 +105,7 @@ jobs:
           severity: 'CRITICAL,HIGH'
           
       - name: Upload Trivy scan results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@c6a366c94c3e0affe28c06c8df20a878f24da3cf # v3.2.2
         with:
           name: trivy-security-report
           path: trivy-results.json
@@ -120,11 +120,11 @@ jobs:
     name: SonarCloud Analysis
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
         with:
           fetch-depth: 0
       - name: SonarCloud Scan
-        uses: SonarSource/sonarcloud-github-action@master
+        uses: SonarSource/sonarcloud-github-action@ffc3010689be73b8e5ae0c57ce35968afd7909e8 # v5.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -138,10 +138,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -158,7 +158,7 @@ jobs:
           chmod 600 ~/.kube/config
 
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@83679a892e2d95755f2dac6acb0bfd1e9ac5d548 # v6.1.0
         with:
           python-version: "3.11"
 
@@ -192,7 +192,7 @@ jobs:
           pytest tests/smoke/ -v --junitxml=smoke-results.xml
 
       - name: Upload test results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@c6a366c94c3e0affe28c06c8df20a878f24da3cf # v3.2.2
         if: always()
         with:
           name: test-results
@@ -211,7 +211,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -236,10 +236,10 @@ jobs:
           chmod 600 ~/.kube/config
 
       - name: Setup kubectl
-        uses: azure/setup-kubectl@v3
+        uses: azure/setup-kubectl@15650b3ad78fff148532a140b8a4c821796b2d7b # v5.0.0
 
       - name: Setup Helm
-        uses: azure/setup-helm@v3
+        uses: azure/setup-helm@dda3372f752e03dde6b3237bc9431cdc2f7a02a2 # v5.0.0
         with:
           version: "v3.14.0"
 
@@ -267,14 +267,17 @@ jobs:
             --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Helm deploy
+        env:
+          APP_SECRET: ${{ secrets.DEV_SECRET_KEY }}
+          DB_PASS: ${{ secrets.DEV_DB_PASSWORD }}
         run: |
           helm upgrade --install cost-optimizer ./helm/cost-optimizer \
           -f ./helm/cost-optimizer/values-dev.yaml \
           --set image.repository=${{ steps.ecr.outputs.ecr_url }} \
           --set image.tag=${{ needs.build-and-push.outputs.image_tag }} \
-          --set app.secretKey=${{ secrets.DEV_SECRET_KEY }} \
-          --set database.password=${{ secrets.DEV_DB_PASSWORD }} \
-          --set postgresql.auth.password=${{ secrets.DEV_DB_PASSWORD }} \
+          --set app.secretKey=$APP_SECRET \
+          --set database.password=$DB_PASS \
+          --set postgresql.auth.password=$DB_PASS \
           --namespace cost-optimizer \
           --create-namespace \
           --timeout 600s \
@@ -289,10 +292,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -309,7 +312,7 @@ jobs:
           chmod 600 ~/.kube/config
 
       - name: Setup Helm
-        uses: azure/setup-helm@v3
+        uses: azure/setup-helm@dda3372f752e03dde6b3237bc9431cdc2f7a02a2 # v5.0.0
         with:
           version: "v3.14.0"
 
@@ -339,7 +342,7 @@ jobs:
     if: always()
     steps:
       - name: Send Telegram Notification
-        uses: appleboy/telegram-action@master
+        uses: appleboy/telegram-action@221e6b684967abe813051ee4a37dd61770a83ad3 # v1.0.1
         with:
           to: ${{ secrets.TELEGRAM_CHAT_ID }}
           token: ${{ secrets.TELEGRAM_BOT_TOKEN }}

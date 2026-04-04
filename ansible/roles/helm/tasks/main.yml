@@ -9,7 +9,7 @@
   ansible.builtin.get_url:
     url: "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip"
     dest: "/tmp/awscliv2.zip"
-    mode: "0644"
+    mode: "0600"
   when: aws_cli_check.rc != 0
   tags: ecr_secret
 

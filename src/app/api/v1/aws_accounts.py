@@ -11,7 +11,7 @@ from app.schemas.aws_accounts import AWSAccountResponse, AWSCreateAccount
 
 router = APIRouter()
 
-@router.post("/", response_model=AWSAccountResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/", response_model=AWSAccountResponse, status_code=status.HTTP_201_CREATED, responses={500: {"description": "Database error"}})
 async def connect_aws_account(account_data: AWSCreateAccount, 
                               current_user: Annotated[User, Depends(get_current_user)],
                               db: Annotated[AsyncSession, Depends(get_db)]):

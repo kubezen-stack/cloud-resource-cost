@@ -15,7 +15,7 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
@@ -24,6 +24,10 @@ COPY --from=builder /install /usr/local
 COPY src/app/ ./app/
 COPY src/alembic/ ./alembic/
 COPY src/alembic.ini .
+
+RUN chown -R appuser:appuser /app
+
+USER appuser
 
 EXPOSE 8000
 

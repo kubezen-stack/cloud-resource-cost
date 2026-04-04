@@ -42,7 +42,7 @@ resource "aws_instance" "ec2_instance" {
   instance_type               = var.instance_type
   subnet_id                   = var.subnet_ids[count.index % length(var.subnet_ids)]
   security_groups             = var.security_group_ids
-  associate_public_ip_address = true
+  associate_public_ip_address = var.environment == "prod" || var.environment == "stage" ? false : true
   key_name                    = var.key_name
   iam_instance_profile        = var.iam_instance_profile
 
@@ -55,7 +55,7 @@ resource "aws_instance" "ec2_instance" {
 
   metadata_options {
     http_endpoint               = "enabled"
-    http_tokens                 = "optional"
+    http_tokens                 = "required"
     http_put_response_hop_limit = 2
     instance_metadata_tags      = "enabled"
   }
