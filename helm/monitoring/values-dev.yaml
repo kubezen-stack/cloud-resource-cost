@@ -14,6 +14,13 @@ victoria-metrics-single:
 
 victoria-metrics-agent:
   enabled: true
+  remoteWrite:
+    - url: "http://monitoring-victoria-metrics-single-server:8428/api/v1/write"
+  extraArgs:
+    envflag.enable: "true"
+    envflag.prefix: "VM_"
+    loggerFormat: json
+    remoteWrite.url: "http://monitoring-victoria-metrics-single-server:8428/api/v1/write"
   config:
     externalLabels:
       env: "dev"
@@ -24,8 +31,6 @@ victoria-metrics-agent:
     limits:
       cpu: 200m
       memory: 256Mi
-  remoteWrite:
-    - url: "http://monitoring-victoria-metrics-single-server:8428/api/v1/write"
 
 loki:
   enabled: true
@@ -40,11 +45,9 @@ loki:
     auth_enabled: false
     commonConfig:
       replication_factor: 1
+      path_prefix: /tmp/loki
     storage:
       type: "filesystem"
-    storage_config:
-      filesystem:
-        directory: /tmp/loki/chunks
     rulerConfig:
       storage:
         type: local

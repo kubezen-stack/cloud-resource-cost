@@ -1,4 +1,4 @@
-victoriametrics:
+victoria-metrics-single:
   enabled: true
   server:
     retentionPeriod: 14d
@@ -13,7 +13,7 @@ victoriametrics:
         cpu: 250m
         memory: 256Mi
 
-vmagent:
+victoria-metrics-agent:
   enabled: true
   resources:
     limits:
