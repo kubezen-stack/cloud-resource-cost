@@ -143,6 +143,9 @@ jobs:
             ubuntu@${MASTER_IP} \
             "cat ~/.kube/config")
 
+          aws secretsmanager restore-secret \
+            --secret-id "cost-optimizer-${{ github.event.inputs.environment }}-kubeconfig" \
+            2>/dev/null || true
           aws secretsmanager put-secret-value \
             --secret-id "cost-optimizer-${{ github.event.inputs.environment }}-kubeconfig" \
             --secret-string "$KUBECONFIG" \
