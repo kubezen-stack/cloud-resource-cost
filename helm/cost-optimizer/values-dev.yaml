@@ -11,14 +11,14 @@ autoscaling:
 imagePullSecrets:
   - name: ecr-secret
 
+service:
+  type: NodePort
+  port: 80
+  targetPort: 8000
+  nodePort: 30080
+
 ingress:
-  enabled: true
-  className: nginx
-  hosts:
-    - host: cost-optimizer-dev.local
-      paths:
-        - path: /
-          pathType: Prefix
+  enabled: false
 
 resources:
   limits:

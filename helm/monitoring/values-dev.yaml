@@ -1,6 +1,9 @@
 victoria-metrics-single:
   enabled: true
   server:
+    service:
+      type: NodePort
+      nodePort: 30428
     retentionPeriod: 3d
     resources:
       requests:
@@ -96,6 +99,9 @@ grafana:
   enabled: true
   persistence:
     enabled: false
+  service:
+    type: NodePort
+    nodePort: 30300
   resources:
     requests:
       cpu: 100m
