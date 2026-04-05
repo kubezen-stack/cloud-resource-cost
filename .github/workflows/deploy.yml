@@ -232,6 +232,12 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
+      - name: Cache Cost-Optimizer Charts
+        uses: actions/cache@a7833574556fa59680c1b7cb190c1735db73ebf0 # v5.0.0
+        with:
+          path: helm/cost-optimizer/charts
+          key: ${{ runner.os }}-cost-optimizer-${{ hashFiles('helm/cost-optimizer/Chart.yaml', 'helm/cost-optimizer/Chart.lock') }}
+
       - name: Get ECR URL from terraform
         id: ecr
         run: |
@@ -261,12 +267,14 @@ jobs:
       - name: Helm install dependencies
         run: |
           helm repo add bitnami https://charts.bitnami.com/bitnami
-          helm repo add jetstack https://charts.jetstack.io
-          helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
           helm repo update
 
-      - name: Helm update dependencies
-        run: helm dependency build ./helm/cost-optimizer
+      - name: Helm build dependencies
+        run: |
+          for i in {1..3}; do
+            helm dependency build ./helm/cost-optimizer && break || \
+            (echo "Attempt $i failed, retrying in 5s..." && sleep 5)
+          done
       
       - name: Create ECR Secret in K8s
         run: |
@@ -342,7 +350,11 @@ jobs:
           helm repo update
 
       - name: Helm update monitoring dependencies
-        run: helm dependency build ./helm/monitoring
+        run: |
+          for i in {1..3}; do
+            helm dependency build ./helm/monitoring && break || \
+            (echo "Attempt $i failed, retrying in 5s..." && sleep 5)
+          done
 
       - name: Helm deploy monitoring
         run: |
