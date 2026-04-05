@@ -69,6 +69,11 @@ loki:
           index:
             prefix: index_
             period: 24h
+  structuredConfig:
+    storage:
+      filesystem:
+        chunks_directory: /tmp/loki/chunks
+        rules_directory: /tmp/loki/rules
   singleBinary:
     replicas: 1
     persistence:
