@@ -46,20 +46,8 @@ loki:
   loki:
     commonConfig:
       replication_factor: 1
-      path_prefix: /tmp/loki
-    compactor:
-      working_directory: /tmp/loki/compactor
-    storage_config:
-      filesystem:
-        chunks_directory: /tmp/loki/chunks
-        rules_directory: /tmp/loki/rules
     storage:
       type: "filesystem"
-    rulerConfig:
-      storage:
-        type: local
-        local:
-          directory: /tmp/loki/rules
     schemaConfig:
       configs:
         - from: "2025-01-01"
@@ -69,15 +57,16 @@ loki:
           index:
             prefix: index_
             period: 24h
-  structuredConfig:
-    storage:
-      filesystem:
-        chunks_directory: /tmp/loki/chunks
-        rules_directory: /tmp/loki/rules
   singleBinary:
     replicas: 1
     persistence:
       enabled: false
+    extraVolumeMounts:
+      - name: loki-data
+        mountPath: /var/loki
+    extraVolumes:
+      - name: loki-data
+        emptyDir: {}
     resources:
       requests:
         cpu: 100m
