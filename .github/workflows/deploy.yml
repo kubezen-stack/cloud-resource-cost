@@ -156,27 +156,29 @@ jobs:
           echo "$KUBECONFIG_DATA" > ~/.kube/config
           chmod 600 ~/.kube/config
 
-      - name: Setup Python
-        uses: actions/setup-python@83679a892e2d95755f2dac6acb0bfd1e9ac5d548 # v6.1.0
-        with:
-          python-version: "3.11"
-
-      - name: Port forward service
-        run: |
-          kubectl port-forward svc/cost-optimizer 8000:80 -n cost-optimizer &
-          sleep 5
-
-      - name: Install test dependencies
-        run: |
-          cd src
-          pip install -r requirements.txt
-
       - name: Wait for app to be ready
         run: |
           kubectl wait --for=condition=ready pod \
             -l app.kubernetes.io/name=cost-optimizer \
             -n cost-optimizer \
             --timeout=120s
+
+      - name: Port forward service
+        if: env.ENVIRONMENT == 'dev'
+        run: |
+          pkill -f "port-forward" || true
+          kubectl port-forward svc/cost-optimizer 8000:80 -n cost-optimizer &
+          sleep 5
+
+      - name: Setup Python
+        uses: actions/setup-python@83679a892e2d95755f2dac6acb0bfd1e9ac5d548 # v6.1.0
+        with:
+          python-version: "3.11"
+
+      - name: Install test dependencies
+        run: |
+          cd src
+          pip install -r requirements.txt
 
       - name: Run unit tests
         run: |
@@ -191,6 +193,8 @@ jobs:
         continue-on-error: true
 
       - name: Run smoke tests
+        env:
+          APP_URL: "http://localhost:8000"
         run: |
           cd src
           pytest tests/smoke/ -v --junitxml=smoke-results.xml
@@ -205,6 +209,11 @@ jobs:
             src/integration-results.xml
             src/smoke-results.xml
           retention-days: 5
+
+      - name: Cleanup port-forward
+        if: always()
+        run: |
+          pkill -f "port-forward" || true
 
   helm-deploy-dev:
     name: "Helm Deploy(dev)"
