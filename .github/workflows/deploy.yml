@@ -25,6 +25,10 @@ on:
         required: false
         default: ""
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   TF_VERSION: "1.6.0"
   ENVIRONMENT: ${{ github.event.inputs.environment || 'dev' }}
@@ -92,8 +96,7 @@ jobs:
           -f docker/Dockerfile \
           -t ${{ steps.tf_outputs.outputs.ecr_url }}:${{ steps.image_tag.outputs.TAG }} \
           -t ${{ steps.tf_outputs.outputs.ecr_url }}:${{ env.ENVIRONMENT }} \
-          --load \
-          .
+          --load .
 
       - name: Run Trivy scanner
         uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
@@ -134,7 +137,6 @@ jobs:
     environment: "${{ github.event.inputs.environment || 'dev' }}"
     needs: helm-deploy-dev
     if: ${{ github.event.inputs.environment == 'dev' || github.event_name == 'push' }}
-
     steps:
       - name: Checkout code
         uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
@@ -164,11 +166,10 @@ jobs:
             --timeout=120s
 
       - name: Port forward service
-        if: env.ENVIRONMENT == 'dev'
         run: |
           pkill -f "port-forward" || true
-          kubectl port-forward svc/cost-optimizer 8000:80 -n cost-optimizer &
-          sleep 5
+          kubectl port-forward svc/cost-optimizer 8888:80 -n cost-optimizer &
+          sleep 10
 
       - name: Setup Python
         uses: actions/setup-python@83679a892e2d95755f2dac6acb0bfd1e9ac5d548 # v6.1.0
@@ -194,7 +195,7 @@ jobs:
 
       - name: Run smoke tests
         env:
-          APP_URL: "http://localhost:8000"
+          APP_URL: "http://127.0.0.1:8888"
         run: |
           cd src
           pytest tests/smoke/ -v --junitxml=smoke-results.xml
@@ -209,11 +210,10 @@ jobs:
             src/integration-results.xml
             src/smoke-results.xml
           retention-days: 5
-
+      
       - name: Cleanup port-forward
         if: always()
-        run: |
-          pkill -f "port-forward" || true
+        run: pkill -f "port-forward" || true
 
   helm-deploy-dev:
     name: "Helm Deploy(dev)"
@@ -221,7 +221,6 @@ jobs:
     environment: "${{ github.event.inputs.environment || 'dev' }}"
     needs: [build-and-push, sonarcloud]
     if: ${{ github.event.inputs.environment == 'dev' || github.event_name == 'push' }}
-
     steps:
       - name: Checkout code
         uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
@@ -267,14 +266,12 @@ jobs:
           helm repo update
 
       - name: Helm update dependencies
-        run: helm dependency update ./helm/cost-optimizer
+        run: helm dependency build ./helm/cost-optimizer
       
       - name: Create ECR Secret in K8s
         run: |
           ECR_PASSWORD=$(aws ecr get-login-password --region ${{ secrets.AWS_REGION }})
-          
           kubectl create namespace cost-optimizer --dry-run=client -o yaml | kubectl apply -f -
-          
           kubectl create secret docker-registry ecr-secret \
             --docker-server=${{ steps.ecr.outputs.ecr_url }} \
             --docker-username=AWS \
@@ -305,10 +302,15 @@ jobs:
     environment: "${{ github.event.inputs.environment || 'dev' }}"
     needs: build-and-push
     if: ${{ github.event.inputs.environment == 'dev' || github.event_name == 'push' }}
-
     steps:
       - name: Checkout code
         uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+
+      - name: Cache Monitoring Charts
+        uses: actions/cache@a7833574556fa59680c1b7cb190c1735db73ebf0 # v5.0.0
+        with:
+          path: helm/monitoring/charts
+          key: ${{ runner.os }}-monitoring-${{ hashFiles('helm/monitoring/Chart.yaml', 'helm/monitoring/Chart.lock') }}
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
@@ -340,7 +342,7 @@ jobs:
           helm repo update
 
       - name: Helm update monitoring dependencies
-        run: helm dependency update ./helm/monitoring
+        run: helm dependency build ./helm/monitoring
 
       - name: Helm deploy monitoring
         run: |
