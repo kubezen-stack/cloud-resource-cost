@@ -161,6 +161,11 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Port forward service
+        run: |
+          kubectl port-forward svc/cost-optimizer 8000:80 -n cost-optimizer &
+          sleep 5
+
       - name: Install test dependencies
         run: |
           cd src
