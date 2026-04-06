@@ -106,14 +106,19 @@ grafana:
     limits:
       cpu: 300m
       memory: 512Mi
-  additionalDataSources:
-    - name: "VictoriaMetrics"
-      type: "prometheus"
-      url: "http://monitoring-victoria-metrics-single-server:8428"
-      isDefault: true
-    - name: "Loki"
-      type: "loki"
-      url: "http://monitoring-loki:3100"
+  datasources:
+    datasources.yaml:
+      apiVersion: 1
+      datasources:
+        - name: VictoriaMetrics
+          type: prometheus
+          url: http://monitoring-victoria-metrics-single-server:8428
+          access: proxy
+          isDefault: true
+        - name: Loki
+          type: loki
+          url: http://monitoring-loki:3100
+          access: proxy
 
 alertmanager:
   enabled: false
