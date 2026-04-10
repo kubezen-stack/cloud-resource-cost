@@ -408,10 +408,15 @@ jobs:
         helm repo add argo https://argoproj.github.io/argo-helm
         helm repo update
 
-    - name: Helm build ArgoCD dependencies
+    - name: Helm update ArgoCD dependencies
       run: |
+        helm repo add argo https://argoproj.github.io/argo-helm
+        helm repo update
+        
+        rm -rf ./helm/argocd/charts
+
         for i in {1..3}; do
-          helm dependency build ./helm/argocd && break || \
+          helm dependency update ./helm/argocd && break || \
           (echo "Attempt $i failed, retrying in 5s..." && sleep 5)
         done
 
