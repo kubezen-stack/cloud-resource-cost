@@ -28,25 +28,25 @@ A full-stack solution for monitoring, analyzing, and optimizing AWS cloud costs.
 │  ┌────────────────────────────────────────────────────────┐ │
 │  │                  Kubernetes Cluster                    │ │
 │  │                                                        │ │
-│  │  ┌──────────────┐  ┌─────────────┐  ┌─────────────┐  │ │
-│  │  │cost-optimizer│  │  monitoring │  │   argocd    │  │ │
-│  │  │  namespace   │  │  namespace  │  │  namespace  │  │ │
-│  │  │              │  │             │  │             │  │ │
-│  │  │  FastAPI app │  │  Victoria   │  │   ArgoCD    │  │ │
-│  │  │  PostgreSQL  │  │  Metrics    │  │             │  │ │
-│  │  │              │  │  Grafana    │  │             │  │ │
-│  │  │              │  │  Loki       │  │             │  │ │
-│  │  │              │  │  Promtail   │  │             │  │ │
-│  │  │              │  │  Alertmgr   │  │             │  │ │
-│  │  └──────────────┘  └─────────────┘  └─────────────┘  │ │
+│  │  ┌──────────────┐  ┌─────────────┐  ┌─────────────┐    │ |
+│  │  │cost-optimizer│  │  monitoring │  │   argocd    │    │ |
+│  │  │  namespace   │  │  namespace  │  │  namespace  │    │ |
+│  │  │              │  │             │  │             │    │ |
+│  │  │  FastAPI app │  │  Victoria   │  │   ArgoCD    │    │ |
+│  │  │  PostgreSQL  │  │  Metrics    │  │             │    │ |
+│  │  │              │  │  Grafana    │  │             │    │ |
+│  │  │              │  │  Loki       │  │             │    │ |
+│  │  │              │  │  Promtail   │  │             │    │ |
+│  │  │              │  │  Alertmgr   │  │             │    │ |
+│  │  └──────────────┘  └─────────────┘  └─────────────┘    │ |
 │  └────────────────────────────────────────────────────────┘ │
 │                                                             │
-│  ┌──────────┐  ┌──────────┐  ┌────────────┐  ┌─────────┐  │
-│  │   ECR    │  │    S3    │  │  Secrets   │  │   IAM   │  │
-│  │  Docker  │  │ reports  │  │  Manager   │  │  roles  │  │
-│  │  images  │  │ backups  │  │  kubeconf  │  │         │  │
-│  │          │  │ tf state │  │  ssh keys  │  │         │  │
-│  └──────────┘  └──────────┘  └────────────┘  └─────────┘  │
+│  ┌──────────┐  ┌──────────┐  ┌────────────┐  ┌─────────┐    │
+│  │   ECR    │  │    S3    │  │  Secrets   │  │   IAM   │    │
+│  │  Docker  │  │ reports  │  │  Manager   │  │  roles  │    │
+│  │  images  │  │ backups  │  │  kubeconf  │  │         │    │
+│  │          │  │ tf state │  │  ssh keys  │  │         │    │
+│  └──────────┘  └──────────┘  └────────────┘  └─────────┘    │
 └─────────────────────────────────────────────────────────────┘
 ```
 
