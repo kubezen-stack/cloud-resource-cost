@@ -63,7 +63,7 @@ resource "aws_instance" "ec2_instance" {
   disable_api_termination = var.environment == "prod" ? true : false
 
   monitoring = var.enable_monitoring
-  user_data  = var.enable_kubernetes ? templatefile("${path.module}/userdata.sh", {
+  user_data = var.enable_kubernetes ? templatefile("${path.module}/userdata.sh", {
     enable_kubernetes  = var.enable_kubernetes
     kubernetes_version = var.kubernetes_version
     hostname-tag       = "${local.hostname-tag}-node"

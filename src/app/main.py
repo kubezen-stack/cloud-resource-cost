@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1 import auth, aws_accounts, costs, health, users
 from app.core.config import settings
+from prometheus_fastapi_instrumentator import Instrumentator
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -22,6 +23,9 @@ app.include_router(users.router, prefix=f"{settings.API_V1_STR}/users", tags=["U
 app.include_router(aws_accounts.router, prefix=f"{settings.API_V1_STR}/aws_accounts", tags=["AWS Accounts"])
 app.include_router(costs.router, prefix=f"{settings.API_V1_STR}/costs", tags=["Costs"])
 app.include_router(health.router, prefix=f"{settings.API_V1_STR}/health", tags=["Health"])
+
+
+Instrumentator().instrument(app).expose(app)
 
 app.add_middleware(
     CORSMiddleware,

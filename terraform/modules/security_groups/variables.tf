@@ -20,7 +20,7 @@ variable "ssh_access_cidr" {
   default     = ["0.0.0.0/0"]
 
   validation {
-    condition    = alltrue([for cidr in var.ssh_access_cidr : can(cidrhost(cidr, 0))])
+    condition     = alltrue([for cidr in var.ssh_access_cidr : can(cidrhost(cidr, 0))])
     error_message = "At least one CIDR block must be specified for SSH access."
   }
 }

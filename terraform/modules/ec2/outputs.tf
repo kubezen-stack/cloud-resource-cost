@@ -52,10 +52,10 @@ output "ssh_connection_information" {
     for i, instance in aws_instance.ec2_instance :
     "node-${i + 1}" => {
       instance_id = "${instance.id}"
-      public_ip  = "${instance.public_ip}"
-      private_ip = "${instance.private_ip}"
-      az         = "${instance.availability_zone}"
-      ssh        = "ssh -i ~/.ssh/${var.key_name}.pem ubuntu@${instance.public_ip}"
+      public_ip   = "${instance.public_ip}"
+      private_ip  = "${instance.private_ip}"
+      az          = "${instance.availability_zone}"
+      ssh         = "ssh -i ~/.ssh/${var.key_name}.pem ubuntu@${instance.public_ip}"
     }
   }
 }

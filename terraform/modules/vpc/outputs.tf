@@ -30,7 +30,7 @@ output "private_cidr_blocks" {
 
 output "public_az_zones" {
   description = "List of availability zones for public subnets"
-  value       =  { for idx, az in var.availability_zones : az => aws_subnet.public[idx].id }
+  value       = { for idx, az in var.availability_zones : az => aws_subnet.public[idx].id }
 }
 
 output "private_az_zones" {

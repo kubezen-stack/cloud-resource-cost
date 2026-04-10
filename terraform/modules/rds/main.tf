@@ -8,15 +8,15 @@ locals {
       Module      = "rds"
     }
   )
-  
-  hostname-tag = "${var.project_name}-${var.environment}"
+
+  hostname-tag  = "${var.project_name}-${var.environment}"
   database-name = replace("${var.db_name}_${var.environment}", "-", "_")
 }
 
 resource "aws_db_subnet_group" "main" {
-  name       = "${var.project_name}-${var.environment}-db-subnet-group"
+  name        = "${var.project_name}-${var.environment}-db-subnet-group"
   description = "Subnet group for RDS instance in ${var.environment} environment"
-  subnet_ids = var.subnet_ids
+  subnet_ids  = var.subnet_ids
 
   tags = merge(
     local.common_tags,
@@ -27,8 +27,8 @@ resource "aws_db_subnet_group" "main" {
 }
 
 resource "random_password" "db_password" {
-  length  = 16
-  special = true
+  length           = 16
+  special          = true
   override_special = "!#$%&*()-_=+[]{}<>:?"
 }
 
@@ -40,9 +40,9 @@ resource "aws_db_instance" "main" {
   engine            = var.db_engine
   engine_version    = var.db_engine_version
   instance_class    = var.db_instance_class
-  db_name  = local.database-name 
-  username = var.db_username
-  password = random_password.db_password.result
+  db_name           = local.database-name
+  username          = var.db_username
+  password          = random_password.db_password.result
 
   # --- Network & Security ---
   db_subnet_group_name   = aws_db_subnet_group.main.name
@@ -51,11 +51,11 @@ resource "aws_db_instance" "main" {
   storage_encrypted      = var.storage_encrypted
 
   # --- High Availability & Maintenance ---
-  multi_az               = var.multi_az
-  parameter_group_name   = aws_db_parameter_group.main.name
-  maintenance_window     = var.maintenance_window
+  multi_az                   = var.multi_az
+  parameter_group_name       = aws_db_parameter_group.main.name
+  maintenance_window         = var.maintenance_window
   auto_minor_version_upgrade = var.auto_minor_version_upgrade
-  apply_immediately      = var.apply_immediately   
+  apply_immediately          = var.apply_immediately
 
   # --- Backup & Termination Protection ---
   deletion_protection       = var.deletion_protection
@@ -87,8 +87,8 @@ resource "aws_db_instance" "main" {
 }
 
 resource "aws_secretsmanager_secret" "db_credentials" {
-  name        = "${var.project_name}-${var.environment}-db-credentials"
-  description = "Secret for RDS database credentials in ${var.environment} environment"
+  name                    = "${var.project_name}-${var.environment}-db-credentials"
+  description             = "Secret for RDS database credentials in ${var.environment} environment"
   recovery_window_in_days = var.environment == "prod" ? 30 : 0
 
   tags = merge(
@@ -100,13 +100,13 @@ resource "aws_secretsmanager_secret" "db_credentials" {
 }
 
 resource "aws_secretsmanager_secret_version" "db_credentials" {
-  secret_id     = aws_secretsmanager_secret.db_credentials.id
+  secret_id = aws_secretsmanager_secret.db_credentials.id
   secret_string = jsonencode({
-    username = var.db_username
-    password = random_password.db_password.result
-    host     = aws_db_instance.main.address
-    port     = aws_db_instance.main.port
-    dbname   = local.database-name
+    username             = var.db_username
+    password             = random_password.db_password.result
+    host                 = aws_db_instance.main.address
+    port                 = aws_db_instance.main.port
+    dbname               = local.database-name
     vault_connection_url = "postgres://${var.db_username}:${random_password.db_password.result}@${aws_db_instance.main.address}:${aws_db_instance.main.port}/${local.database-name}"
   })
 }
@@ -117,20 +117,20 @@ resource "aws_db_parameter_group" "main" {
   description = "Parameter group for RDS instance in ${var.environment} environment"
 
   parameter {
-    name = "rds.force_ssl"
-    value = var.environment == "prod" ? "1" : "0"
+    name         = "rds.force_ssl"
+    value        = var.environment == "prod" ? "1" : "0"
     apply_method = "immediate"
   }
 
   parameter {
-    name = "max_connections"
-    value = var.environment == "prod" ? "200" : "50"
+    name         = "max_connections"
+    value        = var.environment == "prod" ? "200" : "50"
     apply_method = "pending-reboot"
   }
 
   parameter {
-    name = "log_min_duration_statement"
-    value = var.environment == "prod" ? "1000" : "0"
+    name         = "log_min_duration_statement"
+    value        = var.environment == "prod" ? "1000" : "0"
     apply_method = "immediate"
   }
 

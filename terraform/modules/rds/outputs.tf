@@ -35,23 +35,23 @@ output "db_url_connection_string" {
 }
 
 output "master_secret_name" {
-    description = "The name of the Secrets Manager secret storing the database credentials."
-    value       = aws_secretsmanager_secret.db_credentials.name
+  description = "The name of the Secrets Manager secret storing the database credentials."
+  value       = aws_secretsmanager_secret.db_credentials.name
 }
 
 output "master_secret_arn" {
-    description = "The ARN of the Secrets Manager secret storing the database credentials."
-    value       = aws_secretsmanager_secret.db_credentials.arn
+  description = "The ARN of the Secrets Manager secret storing the database credentials."
+  value       = aws_secretsmanager_secret.db_credentials.arn
 }
 
 output "rds_summary" {
   description = "A summary of the RDS instance configuration for easy reference."
   value = {
-    "instance_id" = aws_db_instance.main.id
-    "endpoint" = aws_db_instance.main.address
-    "port" = aws_db_instance.main.port
-    "name" = local.database-name
-    "username" = var.db_username
+    "instance_id"           = aws_db_instance.main.id
+    "endpoint"              = aws_db_instance.main.address
+    "port"                  = aws_db_instance.main.port
+    "name"                  = local.database-name
+    "username"              = var.db_username
     "url_connection_string" = "postgres://${var.db_username}:${random_password.db_password.result}@${aws_db_instance.main.address}:${aws_db_instance.main.port}/${local.database-name}"
   }
   sensitive = true

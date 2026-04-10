@@ -22,6 +22,11 @@ victoria-metrics-agent:
     loggerFormat: json
     remoteWrite.url: "http://monitoring-victoria-metrics-single-server:8428/api/v1/write"
   config:
+    scrape_config:
+      job_name: "cost-optimizer"
+      static_configs:
+        - targets: ["cost-optimizer.cost-optimizer.svc.cluster.local:80"]
+      metrics_path: "/metrics"
     global:
       scrape_interval: 10s
       external_labels:

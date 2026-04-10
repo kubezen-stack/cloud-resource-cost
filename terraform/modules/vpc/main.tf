@@ -3,9 +3,9 @@ locals {
   public_subnets  = length(var.availability_zones)
 
   common_tags = {
-    Name = var.project_name
+    Name        = var.project_name
     Environment = var.environment
-    ManagedBy = "Terraform"
+    ManagedBy   = "Terraform"
   }
 }
 
@@ -15,9 +15,9 @@ resource "aws_vpc" "main" {
   enable_dns_support   = var.dns_support_enabled
 
   tags = merge(local.common_tags,
-    var.tags, 
-    { 
-      Name = "${var.project_name}-vpc-${var.environment}" 
+    var.tags,
+    {
+      Name = "${var.project_name}-vpc-${var.environment}"
     }
   )
 }
@@ -26,9 +26,9 @@ resource "aws_internet_gateway" "igw" {
   vpc_id = aws_vpc.main.id
 
   tags = merge(local.common_tags,
-    var.tags, 
-    { 
-      Name = "${var.project_name}-igw-${var.environment}" 
+    var.tags,
+    {
+      Name = "${var.project_name}-igw-${var.environment}"
     }
   )
 }
@@ -41,10 +41,10 @@ resource "aws_subnet" "public" {
   map_public_ip_on_launch = true
 
   tags = merge(local.common_tags,
-    var.tags, 
-    { 
+    var.tags,
+    {
       Name = "${var.project_name}-public-subnet-${var.availability_zones[count.index]}-${var.environment}"
-      Type = "public" 
+      Type = "public"
     }
   )
 }
@@ -57,9 +57,9 @@ resource "aws_subnet" "private" {
   map_public_ip_on_launch = false
 
   tags = merge(local.common_tags,
-    var.tags, 
-    { 
-      Name = "${var.project_name}-private-subnet-${var.availability_zones[count.index]}-${var.environment}" 
+    var.tags,
+    {
+      Name = "${var.project_name}-private-subnet-${var.availability_zones[count.index]}-${var.environment}"
       Type = "private"
     }
   )
@@ -71,9 +71,9 @@ resource "aws_eip" "nat" {
   domain = "vpc"
 
   tags = merge(local.common_tags,
-    var.tags, 
-    { 
-      Name = "${var.project_name}-nat-eip-${count.index + 1}-${var.environment}" 
+    var.tags,
+    {
+      Name = "${var.project_name}-nat-eip-${count.index + 1}-${var.environment}"
     }
   )
 
@@ -87,9 +87,9 @@ resource "aws_nat_gateway" "nat" {
   subnet_id     = aws_subnet.public[count.index].id
 
   tags = merge(local.common_tags,
-    var.tags, 
-    { 
-      Name = "${var.project_name}-nat-gateway-${count.index + 1}-${var.environment}" 
+    var.tags,
+    {
+      Name = "${var.project_name}-nat-gateway-${count.index + 1}-${var.environment}"
     }
   )
 
@@ -100,9 +100,9 @@ resource "aws_route_table" "public" {
   vpc_id = aws_vpc.main.id
 
   tags = merge(local.common_tags,
-    var.tags, 
-    { 
-      Name = "${var.project_name}-public-rt-${var.environment}" 
+    var.tags,
+    {
+      Name = "${var.project_name}-public-rt-${var.environment}"
       Type = "public"
     }
   )
@@ -125,16 +125,16 @@ resource "aws_route_table" "private" {
   count  = var.nat_gateway_enabled ? 1 : local.private_subnets
 
   tags = merge(local.common_tags,
-    var.tags, 
-    { 
+    var.tags,
+    {
       Name = "${var.project_name}-private-rt-${count.index + 1}-${var.environment}"
-      Type = "private" 
+      Type = "private"
     }
   )
 }
 
 resource "aws_route" "private_nat" {
-  count = var.nat_gateway_enabled ? (var.nat_gateway_single ? 1 : local.private_subnets) : 0
+  count                  = var.nat_gateway_enabled ? (var.nat_gateway_single ? 1 : local.private_subnets) : 0
   route_table_id         = aws_route_table.private[count.index].id
   destination_cidr_block = "0.0.0.0/0"
   nat_gateway_id         = aws_nat_gateway.nat[count.index].id

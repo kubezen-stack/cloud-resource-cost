@@ -8,7 +8,7 @@ locals {
       Module      = "security_groups"
     }
   )
-  
+
   hostname-tag = "${var.project_name}-${var.environment}"
 }
 
@@ -17,10 +17,10 @@ resource "aws_security_group" "ec2_sg_id" {
   description = "Security group for ${var.project_name} in ${var.environment} environment"
   vpc_id      = var.vpc_id
 
-  tags = merge(local.common_tags, 
-    { 
-        Name = "${local.hostname-tag}-ec2-sg",
-        Role = "kubernetes-nodes" 
+  tags = merge(local.common_tags,
+    {
+      Name = "${local.hostname-tag}-ec2-sg",
+      Role = "kubernetes-nodes"
     }
   )
 }
@@ -81,36 +81,36 @@ resource "aws_security_group_rule" "etcd" {
 }
 
 resource "aws_security_group_rule" "http" {
-    type              = "ingress"
-    from_port         = 80
-    to_port           = 80
-    protocol          = "tcp"
-    security_group_id = aws_security_group.ec2_sg_id.id
-    cidr_blocks       = ["0.0.0.0/0"]
-    
-    description = "Allow HTTP access"
+  type              = "ingress"
+  from_port         = 80
+  to_port           = 80
+  protocol          = "tcp"
+  security_group_id = aws_security_group.ec2_sg_id.id
+  cidr_blocks       = ["0.0.0.0/0"]
+
+  description = "Allow HTTP access"
 }
 
 resource "aws_security_group_rule" "https" {
-    type              = "ingress"
-    from_port         = 443
-    to_port           = 443
-    protocol          = "tcp"
-    security_group_id = aws_security_group.ec2_sg_id.id
-    cidr_blocks       = ["0.0.0.0/0"]
-    
-    description = "Allow HTTPS access"
+  type              = "ingress"
+  from_port         = 443
+  to_port           = 443
+  protocol          = "tcp"
+  security_group_id = aws_security_group.ec2_sg_id.id
+  cidr_blocks       = ["0.0.0.0/0"]
+
+  description = "Allow HTTPS access"
 }
 
 resource "aws_security_group_rule" "ec2_internal" {
-  type              = "ingress"
-  from_port         = 0
-  to_port           = 65535
-  protocol          = "-1"
-  security_group_id = aws_security_group.ec2_sg_id.id
+  type                     = "ingress"
+  from_port                = 0
+  to_port                  = 65535
+  protocol                 = "-1"
+  security_group_id        = aws_security_group.ec2_sg_id.id
   source_security_group_id = aws_security_group.ec2_sg_id.id
 
-  description       = "Allow all internal traffic within the security group"
+  description = "Allow all internal traffic within the security group"
 }
 
 resource "aws_security_group_rule" "all_egress" {
@@ -121,7 +121,7 @@ resource "aws_security_group_rule" "all_egress" {
   security_group_id = aws_security_group.ec2_sg_id.id
   cidr_blocks       = var.ssh_access_cidr
 
-  description       = "Allow all outbound traffic"
+  description = "Allow all outbound traffic"
 }
 
 resource "aws_security_group" "rds" {
@@ -129,33 +129,33 @@ resource "aws_security_group" "rds" {
   description = "Security group for RDS instances in ${var.environment} environment"
   vpc_id      = var.vpc_id
 
-  tags = merge(local.common_tags, 
-    { 
-        Name = "${local.hostname-tag}-rds-sg",
-        Role = "database-access" 
+  tags = merge(local.common_tags,
+    {
+      Name = "${local.hostname-tag}-rds-sg",
+      Role = "database-access"
     }
-   )
+  )
 }
 
 resource "aws_security_group_rule" "rds_access_pgsql" {
+  type                     = "ingress"
+  from_port                = 5432
+  to_port                  = 5432
+  protocol                 = "tcp"
+  source_security_group_id = aws_security_group.ec2_sg_id.id
+  security_group_id        = aws_security_group.rds.id
+  description              = "Allow access to RDS PostgreSQL instances"
+}
+
+resource "aws_security_group_rule" "rds_from_allowed_ips" {
+  count             = var.environment != "prod" ? 1 : 0
   type              = "ingress"
   from_port         = 5432
   to_port           = 5432
   protocol          = "tcp"
-  source_security_group_id = aws_security_group.ec2_sg_id.id
   security_group_id = aws_security_group.rds.id
-  description       = "Allow access to RDS PostgreSQL instances"
-}
-
-resource "aws_security_group_rule" "rds_from_allowed_ips" {
-    count            = var.environment != "prod" ? 1 : 0
-    type             = "ingress"
-    from_port        = 5432
-    to_port          = 5432
-    protocol         = "tcp"
-    security_group_id = aws_security_group.rds.id
-    cidr_blocks      = var.ssh_access_cidr
-    description      = "Allow access from allowed IP addresses"
+  cidr_blocks       = var.ssh_access_cidr
+  description       = "Allow access from allowed IP addresses"
 }
 
 resource "aws_security_group_rule" "rds_all_egress" {
@@ -174,24 +174,24 @@ resource "aws_security_group" "redis" {
   description = "Security group for Redis instances in ${var.environment} environment"
   vpc_id      = var.vpc_id
 
-  tags = merge(local.common_tags, 
-    { 
-        Name = "${local.hostname-tag}-redis-sg",
-        Role = "cache-access" 
+  tags = merge(local.common_tags,
+    {
+      Name = "${local.hostname-tag}-redis-sg",
+      Role = "cache-access"
     }
-   )
+  )
 }
 
 resource "aws_security_group_rule" "redis_access" {
-  count             = var.environment == "prod" ? 1 : 0
-  type              = "ingress"
-  from_port         = 6379
-  to_port           = 6379
-  protocol          = "tcp"
+  count                    = var.environment == "prod" ? 1 : 0
+  type                     = "ingress"
+  from_port                = 6379
+  to_port                  = 6379
+  protocol                 = "tcp"
   source_security_group_id = aws_security_group.ec2_sg_id.id
-  security_group_id = aws_security_group.redis[0].id
-  cidr_blocks       = var.ssh_access_cidr
-  description       = "Allow access to Redis instances"
+  security_group_id        = aws_security_group.redis[0].id
+  cidr_blocks              = var.ssh_access_cidr
+  description              = "Allow access to Redis instances"
 }
 
 resource "aws_security_group" "alb" {
@@ -200,67 +200,67 @@ resource "aws_security_group" "alb" {
   description = "Security group for Application Load Balancer in ${var.environment} environment"
   vpc_id      = var.vpc_id
 
-  tags = merge(local.common_tags, 
-    { 
-        Name = "${local.hostname-tag}-alb-sg",
-        Role = "application-load-balancer" 
+  tags = merge(local.common_tags,
+    {
+      Name = "${local.hostname-tag}-alb-sg",
+      Role = "application-load-balancer"
     }
-   )
+  )
 }
 
 resource "aws_security_group_rule" "alb_http" {
-    count             = var.environment == "prod" ? 1 : 0
-    type              = "ingress"
-    from_port         = 80
-    to_port           = 80
-    protocol          = "tcp"
-    security_group_id = aws_security_group.alb[0].id
-    cidr_blocks       = var.ssh_access_cidr
-    
-    description = "Allow HTTP access to ALB"
+  count             = var.environment == "prod" ? 1 : 0
+  type              = "ingress"
+  from_port         = 80
+  to_port           = 80
+  protocol          = "tcp"
+  security_group_id = aws_security_group.alb[0].id
+  cidr_blocks       = var.ssh_access_cidr
+
+  description = "Allow HTTP access to ALB"
 }
 
 resource "aws_security_group_rule" "alb_https" {
-    count             = var.environment == "prod" ? 1 : 0
-    type              = "ingress"
-    from_port         = 443
-    to_port           = 443
-    protocol          = "tcp"
-    security_group_id = aws_security_group.alb[0].id
-    cidr_blocks       = var.ssh_access_cidr
-    
-    description = "Allow HTTPS access to ALB"
+  count             = var.environment == "prod" ? 1 : 0
+  type              = "ingress"
+  from_port         = 443
+  to_port           = 443
+  protocol          = "tcp"
+  security_group_id = aws_security_group.alb[0].id
+  cidr_blocks       = var.ssh_access_cidr
+
+  description = "Allow HTTPS access to ALB"
 }
 
 resource "aws_security_group_rule" "alb_all_egress" {
-  count                    = var.environment == "prod" ? 1 : 0
-  type                     = "egress"
-  from_port                = 0
-  to_port                  = 0
-  protocol                 = "-1"
-  security_group_id        = aws_security_group.alb[0].id
-  cidr_blocks              = var.ssh_access_cidr
-  description              = "Allow all outbound traffic"
+  count             = var.environment == "prod" ? 1 : 0
+  type              = "egress"
+  from_port         = 0
+  to_port           = 0
+  protocol          = "-1"
+  security_group_id = aws_security_group.alb[0].id
+  cidr_blocks       = var.ssh_access_cidr
+  description       = "Allow all outbound traffic"
 }
 
 resource "aws_security_group_rule" "alb_to_ec2" {
-    count                    = var.environment == "prod" ? 1 : 0
-    type                     = "egress"
-    from_port                = 30080
-    to_port                  = 30080
-    protocol                 = "tcp"
-    source_security_group_id = aws_security_group.ec2_sg_id.id
-    security_group_id        = aws_security_group.alb[0].id
-    description              = "Traffic to EC2 instances"
+  count                    = var.environment == "prod" ? 1 : 0
+  type                     = "egress"
+  from_port                = 30080
+  to_port                  = 30080
+  protocol                 = "tcp"
+  source_security_group_id = aws_security_group.ec2_sg_id.id
+  security_group_id        = aws_security_group.alb[0].id
+  description              = "Traffic to EC2 instances"
 }
 
 resource "aws_security_group_rule" "ec2_to_alb" {
-    count                    = var.environment == "prod" ? 1 : 0
-    type                     = "ingress"
-    from_port                = 30080
-    to_port                  = 30080
-    protocol                 = "tcp"
-    source_security_group_id = aws_security_group.alb[0].id
-    security_group_id        = aws_security_group.ec2_sg_id.id
-    description              = "Traffic from ALB to EC2 instances"
+  count                    = var.environment == "prod" ? 1 : 0
+  type                     = "ingress"
+  from_port                = 30080
+  to_port                  = 30080
+  protocol                 = "tcp"
+  source_security_group_id = aws_security_group.alb[0].id
+  security_group_id        = aws_security_group.ec2_sg_id.id
+  description              = "Traffic from ALB to EC2 instances"
 }

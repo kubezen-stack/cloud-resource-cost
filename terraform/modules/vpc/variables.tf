@@ -9,18 +9,18 @@ variable "environment" {
 }
 
 variable "vpc_cidr" {
-    description = "The CIDR block for the VPC"
-    type        = string
+  description = "The CIDR block for the VPC"
+  type        = string
 
-    validation {
-      condition     = can(cidrhost(var.vpc_cidr, 0))
-      error_message = "VPC CIDR must be a valid CIDR block."
-    }
+  validation {
+    condition     = can(cidrhost(var.vpc_cidr, 0))
+    error_message = "VPC CIDR must be a valid CIDR block."
+  }
 }
 
 variable "availability_zones" {
-    description = "A list of availability zones for the VPC"
-    type        = list(string)
+  description = "A list of availability zones for the VPC"
+  type        = list(string)
 }
 
 variable "project_name" {
@@ -30,31 +30,31 @@ variable "project_name" {
 }
 
 variable "nat_gateway_enabled" {
-    description = "Enable NAT Gateway"
-    type        = bool
-    default     = true
+  description = "Enable NAT Gateway"
+  type        = bool
+  default     = true
 }
 
 variable "nat_gateway_single" {
-    description = "Use a single NAT Gateway for the VPC"
-    type        = bool
-    default     = true
+  description = "Use a single NAT Gateway for the VPC"
+  type        = bool
+  default     = true
 }
 
 variable "dns_support_enabled" {
-    description = "Enable DNS support in the VPC"
-    type        = bool
-    default     = true
+  description = "Enable DNS support in the VPC"
+  type        = bool
+  default     = true
 }
 
 variable "dns_hostnames_enabled" {
-    description = "Enable DNS hostnames in the VPC"
-    type        = bool
-    default     = true
+  description = "Enable DNS hostnames in the VPC"
+  type        = bool
+  default     = true
 }
 
 variable "tags" {
-    description = "A map of tags to assign to the VPC"
-    type        = map(string)
-    default     = {}
+  description = "A map of tags to assign to the VPC"
+  type        = map(string)
+  default     = {}
 }

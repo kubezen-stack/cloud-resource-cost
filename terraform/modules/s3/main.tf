@@ -16,10 +16,10 @@ resource "aws_s3_bucket" "reports" {
   bucket = "${local.name_prefix}-reports"
 
   tags = merge(
-  local.common_tags, 
-  {
-    Name        = "Cost Optimizer Reports Bucket"
-    Description = "S3 bucket to store reports for Cost Optimizer project"
+    local.common_tags,
+    {
+      Name        = "Cost Optimizer Reports Bucket"
+      Description = "S3 bucket to store reports for Cost Optimizer project"
   })
 }
 
@@ -72,11 +72,11 @@ resource "aws_s3_bucket" "backups" {
   bucket = "${local.name_prefix}-backups"
 
   tags = merge(
-    local.common_tags, 
+    local.common_tags,
     {
       Name        = "Cost Optimizer Backups Bucket"
       Description = "S3 bucket to store backups for Cost Optimizer project"
-    })
+  })
 }
 
 resource "aws_s3_bucket_versioning" "backups" {
