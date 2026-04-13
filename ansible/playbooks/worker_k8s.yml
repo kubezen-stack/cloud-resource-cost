@@ -1,4 +1,4 @@
-- name: "Set up Kubernetes worker node"
+- name: "Set up Kubernetes worker k8s node"
   hosts: worker
   become: yes
 

@@ -1,4 +1,4 @@
-- name: "Set up Kubernetes master node"
+- name: "Set up Kubernetes master k8s node"
   hosts: master
   become: yes
 

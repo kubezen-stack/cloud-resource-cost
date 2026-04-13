@@ -15,10 +15,11 @@ on:
       playbook:
         description: "Playbook to run"
         required: true
-        default: "site.yml"
+        default: "site_k8s.yml"
         type: choice
         options:
-          - site.yml
+          - site_k3s.yml
+          - site_k8s.yml
           - common.yml
           - master_k8s.yml
           - calico.yml
@@ -113,19 +114,26 @@ jobs:
         working-directory: ansible
         env:
           ANSIBLE_HOST_KEY_CHECKING: "False"
-          ANSIBLE_COLLECTIONS_PATH: "./collections" 
+          ANSIBLE_COLLECTIONS_PATH: "./collections"
           RUNNER_PAT: ${{ secrets.GH_RUNNER_PAT }}
           RUNNER_ENV: "${{ github.event.inputs.environment || 'dev' }}"
         run: |
+          if [[ "${{ github.event.inputs.playbook }}" == "site_dev.yml" || \
+                "${{ github.event.inputs.playbook }}" == "k3s_teardown.yml" ]]; then
+            INVENTORY="inventory/${RUNNER_ENV}/k3s_inventory.yml"
+          else
+            INVENTORY="inventory/${RUNNER_ENV}/aws_ec2.yml"
+          fi
+
           ansible-playbook \
-            -i inventory/${RUNNER_ENV}/aws_ec2.yml \
+            -i ${INVENTORY} \
             playbooks/${{ github.event.inputs.playbook }} \
             --private-key ${{ steps.get_ssh_key.outputs.private_key }} \
             --extra-vars "github_pat=${RUNNER_PAT} target_env=${RUNNER_ENV}" \
             -v
 
-      - name: Get kubeconfig from master node
-        if: contains(fromJson('["site.yml", "master_k8s.yml"]'), github.event.inputs.playbook)
+      - name: Get kubeconfig from master node (k8s or k3s)
+        if: contains(fromJson('["site.yml", "site_k3s.yml", "master_k8s.yml"]'), github.event.inputs.playbook)
         id: kubeconfig
         run: |
           MASTER_IP=$(aws ec2 describe-instances \
@@ -137,15 +145,21 @@ jobs:
             --query "Reservations[0].Instances[0].PublicIpAddress" \
             --output text)
 
-          KUBECONFIG=$(ssh -i ~/.ssh/deploy_key.pem \
-            -o StrictHostKeyChecking=no \
-            -o UserKnownHostsFile=/dev/null \
-            ubuntu@${MASTER_IP} \
-            "cat ~/.kube/config")
+          if [[ "${{ github.event.inputs.playbook }}" == "site_dev.yml" ]]; then
+            KUBECONFIG=$(ssh -i ~/.ssh/deploy_key.pem \
+              -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              ubuntu@${MASTER_IP} \
+              "sudo cat /etc/rancher/k3s/k3s.yaml | \
+               sed 's/127.0.0.1/${MASTER_IP}/g'")
+          else
+            KUBECONFIG=$(ssh -i ~/.ssh/deploy_key.pem \
+              -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              ubuntu@${MASTER_IP} \
+              "cat ~/.kube/config")
+          fi
 
-          aws secretsmanager restore-secret \
-            --secret-id "cost-optimizer-${{ github.event.inputs.environment }}-kubeconfig" \
-            2>/dev/null || true
           aws secretsmanager put-secret-value \
             --secret-id "cost-optimizer-${{ github.event.inputs.environment }}-kubeconfig" \
             --secret-string "$KUBECONFIG" \
@@ -155,5 +169,5 @@ jobs:
             --description "Kubeconfig for cost-optimizer ${{ github.event.inputs.environment }} cluster" \
             --secret-string "$KUBECONFIG"
 
-          echo "kubeconfig_secret=cost-optimizer-${{ github.event.inputs.environment }}-kubeconfig" >> $GITHUB_OUTPUT
+          echo "kubeconfig_secret=cost-optimizer-${ENV}-kubeconfig" >> $GITHUB_OUTPUT
           echo "Kubeconfig saved to Secrets Manager"

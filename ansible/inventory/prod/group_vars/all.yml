@@ -1,6 +1,6 @@
 kubernetes_version: 1.28
 pod_network_cidr: 192.168.0.0/16
-environment: dev
+environment: prod
 
 ansible_user: ubuntu
 ansible_ssh_private_key_file: "/tmp/deploy_key.pem"
@@ -12,11 +12,5 @@ calico_ipip_mode: Never
 calico_vxlan_mode: Always
 calico_typha_enabled: false
 
-master_node: 1
-worker_node: 1
-
-k3s_version: "v1.28.8+k3s1"
-cluster_context: "k3s-dev"
-kubeconfig: "~/.kube/config"
-extra_server_args: ""
-extra_agent_args: ""
+master_node: 3
+worker_node: 3
