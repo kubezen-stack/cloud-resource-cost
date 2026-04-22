@@ -21,7 +21,7 @@
     - common
 
 - name: "Deploy K3s cluster"
-  import_playbook: k3s.orchestration.site
+  import_playbook: k3s_io.k3s.site
 
 - name: "Install Helm"
   import_playbook: helm_group.yml

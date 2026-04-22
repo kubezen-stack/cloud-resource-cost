@@ -74,10 +74,10 @@ jobs:
 
           PRIVATE_KEY=$(echo $SSH_KEY | jq -r '.private_key')
 
-          mkdir -p ~/.ssh
-          echo "$PRIVATE_KEY" > ~/.ssh/deploy_key.pem
-          chmod 600 ~/.ssh/deploy_key.pem
-          echo "private_key=~/.ssh/deploy_key.pem" >> $GITHUB_OUTPUT
+          mkdir -p /home/runner/.ssh
+          echo "$PRIVATE_KEY" > /home/runner/.ssh/deploy_key.pem
+          chmod 600 /home/runner/.ssh/deploy_key.pem
+          echo "private_key=/home/runner/.ssh/deploy_key.pem" >> $GITHUB_OUTPUT
 
       - name: Setup Python
         uses: actions/setup-python@83679a892e2d95755f2dac6acb0bfd1e9ac5d548 # v6.1.0
@@ -139,28 +139,30 @@ jobs:
             --output text)
 
           if [[ "${{ github.event.inputs.playbook }}" == "site_k3s.yml" ]]; then
-            KUBECONFIG=$(ssh -i ~/.ssh/deploy_key.pem \
+            KUBECONFIG=$(ssh -i /home/runner/.ssh/deploy_key.pem \
               -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
               ubuntu@${MASTER_IP} \
               "sudo cat /etc/rancher/k3s/k3s.yaml | \
                sed 's/127.0.0.1/${MASTER_IP}/g'")
           else
-            KUBECONFIG=$(ssh -i ~/.ssh/deploy_key.pem \
+            KUBECONFIG=$(ssh -i /home/runner/.ssh/deploy_key.pem \
               -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
               ubuntu@${MASTER_IP} \
               "cat ~/.kube/config")
           fi
 
+          SECRET_NAME="cost-optimizer-${{ github.event.inputs.environment }}-kubeconfig"
+
           aws secretsmanager put-secret-value \
-            --secret-id "cost-optimizer-${{ github.event.inputs.environment }}-kubeconfig" \
+            --secret-id "${SECRET_NAME}" \
             --secret-string "$KUBECONFIG" \
             2>/dev/null || \
           aws secretsmanager create-secret \
-            --name "cost-optimizer-${{ github.event.inputs.environment }}-kubeconfig" \
+            --name "${SECRET_NAME}" \
             --description "Kubeconfig for cost-optimizer ${{ github.event.inputs.environment }} cluster" \
             --secret-string "$KUBECONFIG"
 
-          echo "kubeconfig_secret=cost-optimizer-${ENV}-kubeconfig" >> $GITHUB_OUTPUT
+          echo "kubeconfig_secret=${SECRET_NAME}" >> $GITHUB_OUTPUT
           echo "Kubeconfig saved to Secrets Manager"

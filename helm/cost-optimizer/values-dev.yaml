@@ -21,14 +21,6 @@ ingress:
   enabled: false
 
 resources:
-  limits:
-    cpu: 1000m
-    memory: 1Gi
-  requests:
-    cpu: 500m
-    memory: 512Mi
-
-resources:
   main:
     requests:
       cpu: 200m
