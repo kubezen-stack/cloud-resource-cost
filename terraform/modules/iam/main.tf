@@ -64,15 +64,15 @@ resource "aws_iam_policy" "ec2_policy" {
         }
       ],
 
-      [
+      length(var.customer_role_arns) > 0 ? [
         {
           Effect = "Allow"
           Action = [
             "sts:AssumeRole"
           ]
-          Resource = "*"
+          Resource = var.customer_role_arns
         }
-      ]
+      ] : []
     )
   })
 

@@ -26,30 +26,9 @@ data:
   config: |
     apiVersion: kubeproxy.config.k8s.io/v1alpha1
     kind: KubeProxyConfiguration
-    clientConnection:
-      kubeconfig: /var/lib/kubelet/kube-proxy.kubeconfig
     mode: "iptables"
     clusterCIDR: {{ pod_network_cidr }}
     metricsBindAddress: 0.0.0.0:10249
-  kubeconfig: |
-    apiVersion: v1
-    kind: Config
-    clusters:
-    - cluster:
-        certificate-authority: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
-        server: https://{{ ansible_facts['default_ipv4']['address'] }}:6443
-      name: default
-    users:
-    - name: kube-proxy
-      user:
-        tokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
-    contexts:
-    - context:
-        cluster: default
-        user: default
-        namespace: default
-      name: default
-    current-context: default
 ---
 apiVersion: apps/v1
 kind: DaemonSet
@@ -87,7 +66,7 @@ spec:
             - /usr/local/bin/kube-proxy
             - --config=/var/lib/kube-proxy/config
             - --hostname-override=$(NODE_NAME)
-            - v=2
+            - --v=2
           securityContext:
             privileged: true
           volumeMounts:

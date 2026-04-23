@@ -44,6 +44,12 @@ variable "s3_bucket_arns" {
   default     = []
 }
 
+variable "customer_role_arns" {
+  description = "List of customer AWS IAM role ARNs that EC2 can assume via sts:AssumeRole. If empty, no AssumeRole permission is granted."
+  type        = list(string)
+  default     = []
+}
+
 variable "tags" {
   description = "A map of tags to assign to the EC2 instances"
   type        = map(string)
