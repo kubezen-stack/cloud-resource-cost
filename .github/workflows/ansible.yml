@@ -100,6 +100,13 @@ jobs:
           restore-keys: |
             ansible-collections-
 
+      - name: Clone k3s-ansible repository
+        if: github.event.inputs.playbook == 'site_k3s.yml'
+        run: |
+          git clone --depth 1 --branch master \
+            https://github.com/k3s-io/k3s-ansible.git \
+            ansible/k3s-ansible
+
       - name: Install Ansible and dependencies
         run: |
           python3 -m pip install ansible-core boto3 botocore kubernetes

@@ -52,4 +52,8 @@ charts/*.tgz
 charts/
 !charts/.gitkeep
 .helm/
+k3s-ansible/
+collections/
+*.pem
+join-command.sh
 MANIFEST
