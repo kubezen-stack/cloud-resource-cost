@@ -221,9 +221,7 @@ jobs:
     needs: [build-and-push, sonarcloud]
     if: ${{ github.event.inputs.environment == 'dev' || github.event_name == 'push' }}
     steps:
-      - name: Clean up Docker before deploy
-        run: docker system prune -f
-
+      
       - name: Checkout code
         uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
 
