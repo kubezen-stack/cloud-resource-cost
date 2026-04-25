@@ -103,7 +103,7 @@ jobs:
       - name: Clone k3s-ansible repository
         if: github.event.inputs.playbook == 'site_k3s.yml'
         run: |
-          git clone --depth 1 --branch master \
+          git clone --depth 1 --branch main \
             https://github.com/k3s-io/k3s-ansible.git \
             ansible/k3s-ansible
 
