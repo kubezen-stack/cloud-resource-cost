@@ -5,7 +5,7 @@ nat_gateway_enabled = false
 nat_gateway_single  = false
 
 instance_type      = "t3.small"
-instance_count     = 1
+instance_count     = 2
 storage_size       = 30
 storage_type       = "gp3"
 ami_id             = ""

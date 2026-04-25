@@ -1,0 +1,6 @@
+- name: "Common setup for all nodes"
+  hosts: all
+  become: yes
+
+  roles:
+    - common

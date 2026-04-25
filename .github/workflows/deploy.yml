@@ -221,7 +221,7 @@ jobs:
     needs: [build-and-push, sonarcloud]
     if: ${{ github.event.inputs.environment == 'dev' || github.event_name == 'push' }}
     steps:
-      
+    
       - name: Checkout code
         uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
 
@@ -238,13 +238,25 @@ jobs:
           path: helm/cost-optimizer/charts
           key: ${{ runner.os }}-cost-optimizer-${{ hashFiles('helm/cost-optimizer/Chart.yaml', 'helm/cost-optimizer/Chart.lock') }}
 
+      - name: Cache Terraform plugins
+        uses: actions/cache@a7833574556fa59680c1b7cb190c1735db73ebf0 # v5.0.0
+        with:
+          path: |
+            ~/.terraform.d/plugin-cache
+            terraform/environments/${{ env.ENVIRONMENT }}/.terraform
+          key: terraform-${{ env.ENVIRONMENT }}-${{ hashFiles('terraform/environments/${{ env.ENVIRONMENT }}/.terraform.lock.hcl') }}
+          restore-keys: |
+            terraform-${{ env.ENVIRONMENT }}-
+
       - name: Get ECR URL from terraform
         id: ecr
         run: |
           cd terraform/environments/${{ env.ENVIRONMENT }}
-          terraform init
+          terraform init -input=false
           ECR_URL=$(terraform output -raw ecr_repository_url)
           echo "ecr_url=${ECR_URL}" >> $GITHUB_OUTPUT
+        env:
+          TF_PLUGIN_CACHE_DIR: ~/.terraform.d/plugin-cache
 
       - name: Get kubeconfig from Secrets Manager
         run: |
