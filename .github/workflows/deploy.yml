@@ -415,11 +415,6 @@ jobs:
         path: helm/argocd/charts
         key: ${{ runner.os }}-argocd-${{ hashFiles('helm/argocd/Chart.yaml', 'helm/argocd/Chart.lock') }}
 
-    - name: Helm install dependencies
-      run: |
-        helm repo add argo https://argoproj.github.io/argo-helm
-        helm repo update
-
     - name: Helm update ArgoCD dependencies
       run: |
         helm repo add argo https://argoproj.github.io/argo-helm
