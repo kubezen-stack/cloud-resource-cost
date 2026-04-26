@@ -467,6 +467,8 @@ jobs:
           -n argocd \
           --timeout=120s
 
+        sleep 30
+
         ARGOCD_PASSWORD=$(aws secretsmanager get-secret-value \
           --secret-id "cost-optimizer-dev-argocd-password" \
           --query SecretString \
