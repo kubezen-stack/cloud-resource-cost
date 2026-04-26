@@ -320,7 +320,7 @@ jobs:
     name: "Helm Deploy Monitoring(dev)"
     runs-on: "self-hosted"
     environment: "${{ github.event.inputs.environment || 'dev' }}"
-    needs: helm-deploy-dev
+    needs: [helm-deploy-dev, run-tests]
     if: ${{ github.event.inputs.environment == 'dev' || github.event_name == 'push' }}
     steps:
       - name: Checkout code
@@ -381,7 +381,7 @@ jobs:
     name: "ArgoCD Deploy(dev)"
     runs-on: "self-hosted"
     environment: "${{ github.event.inputs.environment || 'dev' }}"
-    needs: helm-deploy-dev
+    needs: [helm-deploy-dev, helm-deploy-monitoring-dev]
     if: ${{ github.event.inputs.environment == 'dev' || github.event_name == 'push' }}
     steps:
     - name: Checkout code
