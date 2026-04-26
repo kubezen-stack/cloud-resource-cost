@@ -279,7 +279,7 @@ jobs:
       - name: Helm install dependencies
         run: |
           helm repo add bitnami https://charts.bitnami.com/bitnami
-          helm repo update
+          helm repo update bitnami
 
       - name: Helm build dependencies
         run: |
@@ -359,7 +359,7 @@ jobs:
           helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
           helm repo add victoriametrics https://victoriametrics.github.io/helm-charts
           helm repo add grafana https://grafana.github.io/helm-charts
-          helm repo update
+          helm repo update prometheus-community victoriametrics grafana
 
       - name: Helm update monitoring dependencies
         run: |
