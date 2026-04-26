@@ -476,17 +476,16 @@ jobs:
           -l app.kubernetes.io/name=argocd-server \
           -n argocd \
           --timeout=120s
-        
+
         ARGOCD_PASSWORD=$(aws secretsmanager get-secret-value \
           --secret-id "cost-optimizer-dev-argocd-password" \
           --query SecretString \
           --output text)
-        
+
         ./argocd-linux-amd64 login ${{ steps.ec2_ip.outputs.ec2_ip }}:30808 \
           --insecure \
           --username admin \
-          --password "$ARGOCD_PASSWORD" \
-          --grpc-web
+          --password "$ARGOCD_PASSWORD"
 
   notify:
     name: "Final Notification"
