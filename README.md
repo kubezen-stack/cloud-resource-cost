@@ -28,25 +28,25 @@ A full-stack solution for monitoring, analyzing, and optimizing AWS cloud costs.
 │  ┌────────────────────────────────────────────────────────┐ │
 │  │                  Kubernetes Cluster                    │ │
 │  │                                                        │ │
-│  │  ┌──────────────┐  ┌─────────────┐  ┌─────────────┐    │ |
-│  │  │cost-optimizer│  │  monitoring │  │   argocd    │    │ |
-│  │  │  namespace   │  │  namespace  │  │  namespace  │    │ |
-│  │  │              │  │             │  │             │    │ |
-│  │  │  FastAPI app │  │  Victoria   │  │   ArgoCD    │    │ |
-│  │  │  PostgreSQL  │  │  Metrics    │  │             │    │ |
-│  │  │              │  │  Grafana    │  │             │    │ |
-│  │  │              │  │  Loki       │  │             │    │ |
-│  │  │              │  │  Promtail   │  │             │    │ |
-│  │  │              │  │  Alertmgr   │  │             │    │ |
-│  │  └──────────────┘  └─────────────┘  └─────────────┘    │ |
+│  │  ┌──────────────┐  ┌─────────────┐  ┌─────────────┐   │ │
+│  │  │cost-optimizer│  │  monitoring │  │   argocd    │   │ │
+│  │  │  namespace   │  │  namespace  │  │  namespace  │   │ │
+│  │  │              │  │             │  │             │   │ │
+│  │  │  FastAPI app │  │  Victoria   │  │   ArgoCD    │   │ │
+│  │  │  PostgreSQL  │  │  Metrics    │  │             │   │ │
+│  │  │              │  │  Grafana    │  │             │   │ │
+│  │  │              │  │  Loki       │  │             │   │ │
+│  │  │              │  │  Promtail   │  │             │   │ │
+│  │  │              │  │  Alertmgr   │  │             │   │ │
+│  │  └──────────────┘  └─────────────┘  └─────────────┘   │ │
 │  └────────────────────────────────────────────────────────┘ │
 │                                                             │
-│  ┌──────────┐  ┌──────────┐  ┌────────────┐  ┌─────────┐    │
-│  │   ECR    │  │    S3    │  │  Secrets   │  │   IAM   │    │
-│  │  Docker  │  │ reports  │  │  Manager   │  │  roles  │    │
-│  │  images  │  │ backups  │  │  kubeconf  │  │         │    │
-│  │          │  │ tf state │  │  ssh keys  │  │         │    │
-│  └──────────┘  └──────────┘  └────────────┘  └─────────┘    │
+│  ┌──────────┐  ┌──────────┐  ┌────────────┐  ┌─────────┐   │
+│  │   ECR    │  │    S3    │  │  Secrets   │  │   IAM   │   │
+│  │  Docker  │  │ reports  │  │  Manager   │  │  roles  │   │
+│  │  images  │  │ backups  │  │  kubeconf  │  │         │   │
+│  │          │  │ tf state │  │  ssh keys  │  │         │   │
+│  └──────────┘  └──────────┘  └────────────┘  └─────────┘   │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -96,7 +96,7 @@ The application interacts with the **AWS Cost Explorer API** by assuming IAM rol
 │   └── terraform.yml        # Infrastructure lifecycle workflow
 ├── ansible/
 │   ├── inventory/dev/       # AWS EC2 dynamic inventory
-│   ├── playbooks/           # site, master, worker, calico, helm, runner
+│   ├── playbooks/           # site_k8s, site_k3s, master, worker, calico, helm, runner
 │   └── roles/               # common, kubernetes, master, worker, helm, github-runner, calico
 ├── docker/
 │   └── Dockerfile           # Multi-stage Python build
@@ -147,6 +147,7 @@ Configure these in **Settings → Secrets and variables → Actions** before run
 | `SONAR_TOKEN` | SonarCloud authentication token |
 | `TOKEN` | GitHub token for SonarCloud |
 | `GH_RUNNER_PAT` | GitHub PAT for runner registration |
+| `K3S_TOKEN` | Token for k3s cluster (used by Ansible) |
 | `TELEGRAM_BOT_TOKEN` | Telegram bot token for notifications |
 | `TELEGRAM_CHAT_ID` | Telegram chat ID for notifications |
 
@@ -204,16 +205,33 @@ terraform plan -var="environment=dev"
 terraform apply -var="environment=dev"
 ```
 
-**Resources created:** VPC, subnets, Security Groups, EC2 instances, ECR repository, S3 buckets (reports + backups), IAM roles and policies, Secrets Manager secrets (SSH key).
+**Resources created:** VPC, subnets, Security Groups, EC2 instances (t3.medium), ECR repository, S3 buckets (reports + backups), IAM roles and policies, Secrets Manager secrets (SSH key, kubeconfig, ArgoCD password).
 
 ### Step 3 — Configure Kubernetes Cluster
 
-Via GitHub Actions → **Ansible** workflow → `site.yml` playbook.
+Via GitHub Actions → **Ansible** workflow → select playbook.
 
-The playbook runs in sequence:
+**Supported playbooks:**
 
+| Playbook | Description |
+|----------|-------------|
+| `site_k8s.yml` | Full kubeadm cluster setup (recommended) |
+| `site_k3s.yml` | Full k3s cluster setup |
+| `common.yml` | Base packages + kernel config |
+| `master_k8s.yml` | Initialize Kubernetes master node |
+| `calico.yml` | Install and configure Calico CNI |
+| `worker_k8s.yml` | Join worker nodes to the cluster |
+| `helm_group.yml` | Install Helm + create ECR pull secret |
+| `github_runner.yml` | Register self-hosted GitHub Actions runner |
+
+**kubeadm flow (`site_k8s.yml`):**
 ```
 common setup → kubernetes install → master init → calico CNI → worker join → helm install → github runner
+```
+
+**k3s flow (`site_k3s.yml`):**
+```
+common setup → k3s deploy → helm install → github runner
 ```
 
 After completion, kubeconfig is automatically saved to AWS Secrets Manager as `cost-optimizer-dev-kubeconfig`.
@@ -234,7 +252,7 @@ After completion, kubeconfig is automatically saved to AWS Secrets Manager as `c
 
 **Application:**
 ```bash
-helm dependency build ./helm/cost-optimizer
+helm dependency build ./helm/cost-optimizer --skip-refresh
 helm upgrade --install cost-optimizer ./helm/cost-optimizer \
   -f ./helm/cost-optimizer/values-dev.yaml \
   --set image.repository=<ECR_URL> \
@@ -249,7 +267,7 @@ helm upgrade --install cost-optimizer ./helm/cost-optimizer \
 
 **Monitoring:**
 ```bash
-helm dependency build ./helm/monitoring
+helm dependency build ./helm/monitoring --skip-refresh
 helm upgrade --install monitoring ./helm/monitoring \
   -f ./helm/monitoring/values-dev.yaml \
   --namespace monitoring --create-namespace \
@@ -258,7 +276,7 @@ helm upgrade --install monitoring ./helm/monitoring \
 
 **ArgoCD:**
 ```bash
-helm dependency build ./helm/argocd
+helm dependency build ./helm/argocd --skip-refresh
 helm upgrade --install argocd ./helm/argocd \
   -f ./helm/argocd/values-dev.yaml \
   --namespace argocd --create-namespace \
@@ -278,6 +296,11 @@ helm upgrade --install argocd ./helm/argocd \
 ```bash
 kubectl -n argocd get secret argocd-initial-admin-secret \
   -o jsonpath="{.data.password}" | base64 -d
+
+# Or from AWS Secrets Manager:
+aws secretsmanager get-secret-value \
+  --secret-id "cost-optimizer-dev-argocd-password" \
+  --query SecretString --output text
 ```
 
 **Access VictoriaMetrics:**
@@ -295,22 +318,25 @@ kubectl port-forward svc/monitoring-victoria-metrics-single-server \
 Triggered automatically on push to `main` (paths: `src/**`, `helm/**`, `docker/**`) or manually.
 
 ```
-sonarcloud ──────────────────────────────────────────────────────────────────┐
-                                                                              ▼
-build-and-push ──► helm-deploy-dev ──────────────► run-tests ──────────► notify
-               ├──► helm-deploy-monitoring-dev ──────────────────────────────┤
-               └──► argo-cd-dev ─────────────────────────────────────────────┘
+sonarcloud ───────────────────────────────────────────────────────────────┐
+                                                                           ▼
+build-and-push ──► helm-deploy-dev ──────────────► run-tests ────────► notify
+                        │
+                        ├──► helm-deploy-monitoring-dev ──────────────────┤
+                        └──► argo-cd-dev ────────────────────────────────┘
 ```
 
 | Job | Runner | Description |
 |-----|--------|-------------|
 | `sonarcloud` | ubuntu-latest | Static code analysis |
-| `build-and-push` | ubuntu-latest | Build Docker image, Trivy security scan, push to ECR |
+| `build-and-push` | ubuntu-latest | Build Docker image, Trivy scan, push to ECR |
 | `helm-deploy-dev` | self-hosted | Deploy application via Helm |
 | `helm-deploy-monitoring-dev` | self-hosted | Deploy monitoring stack via Helm |
-| `argo-cd-dev` | self-hosted | Deploy ArgoCD via Helm |
+| `argo-cd-dev` | self-hosted | Deploy ArgoCD via Helm (`continue-on-error: true` on login) |
 | `run-tests` | self-hosted | Unit, integration, and smoke tests |
 | `notify` | ubuntu-latest | Telegram notification with full results |
+
+> **Note:** The ArgoCD login step uses `continue-on-error: true` because the NodePort may not be immediately reachable after the pod becomes ready. ArgoCD itself is deployed successfully regardless.
 
 ### `terraform.yml` — Infrastructure
 
@@ -324,17 +350,7 @@ Triggered on changes to `terraform/**` or manually.
 
 ### `ansible.yml` — Cluster Provisioning
 
-Manual trigger only. Selectable playbooks:
-
-| Playbook | Description |
-|----------|-------------|
-| `site.yml` | Full cluster setup (recommended for first run) |
-| `common.yml` | Base packages + kernel config |
-| `master_k8s.yml` | Initialize Kubernetes master node |
-| `calico.yml` | Install and configure Calico CNI |
-| `worker_k8s.yml` | Join worker nodes to the cluster |
-| `helm_group.yml` | Install Helm + create ECR pull secret |
-| `github_runner.yml` | Register self-hosted GitHub Actions runner |
+Manual trigger only. Supports both kubeadm (k8s) and k3s cluster flavors.
 
 ---
 
@@ -361,6 +377,10 @@ Manual trigger only. Selectable playbooks:
 
 - **Node Exporter Full** (gnetId: 1860)
 - **Kubernetes Cluster** (gnetId: 315)
+
+### Application Metrics
+
+The FastAPI app exposes Prometheus metrics at `/metrics` via `prometheus-fastapi-instrumentator`. VictoriaMetrics agent scrapes it at `cost-optimizer.cost-optimizer.svc.cluster.local:80`.
 
 ---
 
@@ -435,3 +455,13 @@ pytest -v --junitxml=results.xml
 | Smoke | `tests/smoke/` | End-to-end tests against a live deployed application |
 
 Test results are uploaded as artifacts in GitHub Actions and reported to SonarCloud for quality gate analysis.
+
+### What Smoke Tests Cover
+
+- Health and readiness endpoints
+- OpenAPI schema presence and required routes
+- Auth registration and login flows
+- JWT middleware enforcement
+- User profile CRUD
+- AWS account creation and listing
+- Cost endpoint availability (without real AWS credentials)
