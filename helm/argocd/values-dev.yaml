@@ -2,7 +2,7 @@ argo-cd:
   server:
     service:
       type: NodePort
-      nodePort: 30808
+      nodePortHttp: 30808
   configs:
     params:
       server.insecure: true
