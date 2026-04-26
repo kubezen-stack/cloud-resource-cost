@@ -418,7 +418,7 @@ jobs:
     - name: Helm update ArgoCD dependencies
       run: |
         helm repo add argo https://argoproj.github.io/argo-helm
-        helm repo update
+        helm repo update argo
         
         rm -rf ./helm/argocd/charts
 
