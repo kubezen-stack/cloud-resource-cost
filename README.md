@@ -336,7 +336,7 @@ build-and-push ──► helm-deploy-dev ─────────────
 | `run-tests` | self-hosted | Unit, integration, and smoke tests |
 | `notify` | ubuntu-latest | Telegram notification with full results |
 
-> **Note:** The ArgoCD login step uses `continue-on-error: true` because the NodePort may not be immediately reachable after the pod becomes ready. ArgoCD itself is deployed successfully regardless.
+> **Note:** Note: The ArgoCD login step uses `continue-on-error: true` because it is not a critical step — the application is already deployed via Helm in the previous job. The login only verifies that ArgoCD is accessible after deployment.
 
 ### `terraform.yml` — Infrastructure
 
