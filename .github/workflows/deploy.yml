@@ -283,10 +283,7 @@ jobs:
 
       - name: Helm build dependencies
         run: |
-          for i in {1..3}; do
-            helm dependency build ./helm/cost-optimizer && break || \
-            (echo "Attempt $i failed, retrying in 5s..." && sleep 5)
-          done
+          helm dependency build ./helm/cost-optimizer --skip-refresh
       
       - name: Create ECR Secret in K8s
         run: |
@@ -363,10 +360,7 @@ jobs:
 
       - name: Helm update monitoring dependencies
         run: |
-          for i in {1..3}; do
-            helm dependency build ./helm/monitoring && break || \
-            (echo "Attempt $i failed, retrying in 5s..." && sleep 5)
-          done
+          helm dependency build ./helm/monitoring --skip-refresh
 
       - name: Helm deploy monitoring
         run: |
@@ -420,7 +414,7 @@ jobs:
         helm repo add argo https://argoproj.github.io/argo-helm
         helm repo update argo
         rm -rf ./helm/argocd/charts
-        helm dependency update ./helm/argocd
+        helm dependency build ./helm/argocd --skip-refresh
 
     - name: Helm deploy ArgoCD
       run: |

@@ -70,7 +70,7 @@ postgresql:
   image:
     registry: "public.ecr.aws"
     repository: "bitnami/postgresql"
-    tag: "latest"
+    tag: "16.1.0-debian-11-r15"
   auth:
     username: dbadmin
     database: cost_optimizer_dev
