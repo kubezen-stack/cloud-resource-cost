@@ -461,13 +461,12 @@ jobs:
         chmod +x argocd-linux-amd64
 
     - name: ArgoCD Login
+      continue-on-error: true
       run: |
         kubectl wait --for=condition=ready pod \
           -l app.kubernetes.io/name=argocd-server \
           -n argocd \
           --timeout=120s
-
-        sleep 30
 
         ARGOCD_PASSWORD=$(aws secretsmanager get-secret-value \
           --secret-id "cost-optimizer-dev-argocd-password" \
