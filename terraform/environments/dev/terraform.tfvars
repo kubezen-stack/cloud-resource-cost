@@ -4,7 +4,7 @@ availability_zones  = ["us-east-1a", "us-east-1b"]
 nat_gateway_enabled = false
 nat_gateway_single  = false
 
-instance_type      = "t3.small"
+instance_type      = "t3.medium"
 instance_count     = 2
 storage_size       = 30
 storage_type       = "gp3"
