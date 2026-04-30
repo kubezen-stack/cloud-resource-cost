@@ -1,28 +1,26 @@
-- name: Check if AWS CLI is installed
+- name: Check if AWS CLI is installed (cached check)
   ansible.builtin.command: which aws
   register: aws_cli_check
   ignore_errors: true
   changed_when: false
   tags: ecr_secret
 
-- name: Download AWS CLI
-  ansible.builtin.get_url:
-    url: "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip"
-    dest: "/tmp/awscliv2.zip"
-    mode: "0600"
-  when: aws_cli_check.rc != 0
-  tags: ecr_secret
+- name: Download and install AWS CLI (combined)
+  block:
+    - name: Download AWS CLI
+      ansible.builtin.get_url:
+        url: "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip"
+        dest: "/tmp/awscliv2.zip"
+        mode: "0600"
 
-- name: Unzip AWS CLI
-  ansible.builtin.unarchive:
-    src: /tmp/awscliv2.zip
-    dest: /tmp
-    remote_src: yes
-  when: aws_cli_check.rc != 0
-  tags: ecr_secret
+    - name: Unzip AWS CLI
+      ansible.builtin.unarchive:
+        src: /tmp/awscliv2.zip
+        dest: /tmp
+        remote_src: yes
 
-- name: Install AWS CLI
-  ansible.builtin.shell: /tmp/aws/install --update
+    - name: Install AWS CLI
+      ansible.builtin.shell: /tmp/aws/install --update
   when: aws_cli_check.rc != 0
   tags: ecr_secret
 
@@ -53,14 +51,10 @@
   tags: cleanup
 
 - name: Get ECR registry URL
-  ansible.builtin.shell: |
-    aws ecr describe-repositories \
-      --repository-names "cost-optimizer-{{ target_env }}" \
-      --query "repositories[0].repositoryUri" \
-      --output text | cut -d'/' -f1
-  register: ecr_registry_url
-  changed_when: false
+  ansible.builtin.set_fact:
+    ecr_registry_url: "{{ ecr_registry_url | default(lookup('ansible.builtin.shell', 'aws ecr describe-repositories --repository-names "cost-optimizer-'${target_env}'" --query repositories[0].repositoryUri --output text | cut -d/ -f1')) }}"
   tags: ecr_secret
+  when: ecr_registry_url is not defined
 
 - name: Get ECR authorization token
   ansible.builtin.shell: |

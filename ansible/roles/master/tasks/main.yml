@@ -59,16 +59,11 @@
   tags: init
 
 - name: Display control plane pods
-  ansible.builtin.command: kubectl get pods -n kube-system
+  ansible.builtin.command: kubectl get pods -n kube-system --no-headers
   environment:
     KUBECONFIG: /etc/kubernetes/admin.conf
   register: pods_status
   changed_when: false
-  tags: init
-
-- name: Show control plane pods
-  ansible.builtin.debug:
-    var: pods_status.stdout_lines
   tags: init
 
 - name: Install Calico network plugin

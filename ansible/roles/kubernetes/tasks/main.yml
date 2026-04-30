@@ -70,6 +70,11 @@
   changed_when: false
   tags: containerd
 
+- name: Set ECR registry fact for other roles
+  ansible.builtin.set_fact:
+    ecr_registry_url: "{{ ecr_registry_url.stdout }}"
+  tags: containerd
+
 - name: Install amazon-ecr-credential-helper
   ansible.builtin.apt:
     name: amazon-ecr-credential-helper

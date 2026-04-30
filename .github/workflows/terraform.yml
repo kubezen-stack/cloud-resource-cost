@@ -70,27 +70,30 @@ jobs:
           path: |
             ~/.terraform.d/plugin-cache
             ${{ env.WORKING_DIR }}/.terraform
-          key: terraform-${{ env.TARGET_ENV }}-${{ hashFiles('**/.terraform.lock.hcl') }}
+          key: terraform-${{ env.TARGET_ENV }}-${{ hashFiles('**/*.tf', '**/*.tfvars') }}
           restore-keys: |
             terraform-${{ env.TARGET_ENV }}-
+            terraform-${{ env.TARGET_ENV }}
 
       - name: Terraform Init
-        run: terraform init
+        run: terraform init -input=false
         env:
           TF_PLUGIN_CACHE_DIR: ~/.terraform.d/plugin-cache
 
       - name: Terraform format
-        run: terraform fmt -check -recursive
+        run: terraform fmt -check -recursive -diff
 
       - name: Terraform Validate
-        run: terraform validate
+        run: terraform validate -json
         continue-on-error: true
 
       - name: Terraform Plan
         run: |
           terraform plan \
           -var="environment=${{ env.TARGET_ENV }}" \
-          -out=tfplan-${{ env.TARGET_ENV }}
+          -out=tfplan-${{ env.TARGET_ENV }} \
+          -input=false \
+          -lock=true
 
       - name: Terraform Upload Plan
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
@@ -175,10 +178,12 @@ jobs:
           terraform_version: ${{ env.TF_VERSION }}
 
       - name: Terraform Init
-        run: terraform init
+        run: terraform init -input=false
 
       - name: Terraform Destroy
         run: |
           terraform destroy \
           -var="environment=${{ github.event.inputs.environment || 'dev' }}" \
-          -auto-approve
+          -auto-approve \
+          -input=false \
+          -lock=false

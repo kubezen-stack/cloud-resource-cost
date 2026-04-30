@@ -65,6 +65,16 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
+      - name: Cache Terraform plugins
+        uses: actions/cache@a7833574556fa59680c1b7cb190c1735db73ebf0 # v5.0.0
+        with:
+          path: |
+            ~/.terraform.d/plugin-cache
+            terraform/environments/${{ env.ENVIRONMENT }}/.terraform
+          key: terraform-${{ env.ENVIRONMENT }}-${{ hashFiles('terraform/environments/${{ env.ENVIRONMENT }}/.terraform.lock.hcl') }}
+          restore-keys: |
+            terraform-${{ env.ENVIRONMENT }}-
+
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
         with:
@@ -73,7 +83,9 @@ jobs:
 
       - name: Terraform Init
         working-directory: terraform/environments/${{ env.ENVIRONMENT }}
-        run: terraform init
+        run: terraform init -input=false
+        env:
+          TF_PLUGIN_CACHE_DIR: ~/.terraform.d/plugin-cache
 
       - name: Get ECR URL from terraform
         id: tf_outputs
@@ -82,6 +94,8 @@ jobs:
           ECR_URL=$(terraform output -raw ecr_repository_url)
           echo "ECR_URL is: ${ECR_URL}"
           echo "ecr_url=${ECR_URL}" >> $GITHUB_OUTPUT
+        env:
+          TF_PLUGIN_CACHE_DIR: ~/.terraform.d/plugin-cache
 
       - name: Login to ECR
         id: login-ecr
@@ -317,7 +331,7 @@ jobs:
     name: "Helm Deploy Monitoring(dev)"
     runs-on: "self-hosted"
     environment: "${{ github.event.inputs.environment || 'dev' }}"
-    needs: [helm-deploy-dev, run-tests]
+    needs: helm-deploy-dev
     if: ${{ github.event.inputs.environment == 'dev' || github.event_name == 'push' }}
     steps:
       - name: Checkout code
@@ -375,7 +389,7 @@ jobs:
     name: "ArgoCD Deploy(dev)"
     runs-on: "self-hosted"
     environment: "${{ github.event.inputs.environment || 'dev' }}"
-    needs: [helm-deploy-dev, helm-deploy-monitoring-dev]
+    needs: helm-deploy-monitoring-dev
     if: ${{ github.event.inputs.environment == 'dev' || github.event_name == 'push' }}
     steps:
     - name: Checkout code
@@ -413,7 +427,6 @@ jobs:
       run: |
         helm repo add argo https://argoproj.github.io/argo-helm
         helm repo update argo
-        rm -rf ./helm/argocd/charts
         helm dependency build ./helm/argocd --skip-refresh
 
     - name: Helm deploy ArgoCD

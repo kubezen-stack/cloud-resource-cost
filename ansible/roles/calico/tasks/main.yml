@@ -115,16 +115,11 @@
 
 - name: Get Calico pods status
   become: no
-  ansible.builtin.command: kubectl get pods -n kube-system -l k8s-app=calico-node -o wide
+  ansible.builtin.command: kubectl get pods -n kube-system -l k8s-app=calico-node --no-headers
   environment:
     KUBECONFIG: /home/ubuntu/.kube/config
   register: calico_pods_status
   changed_when: false
-  tags: verify
-
-- name: Display Calico pods
-  ansible.builtin.debug:
-    var: calico_pods_status.stdout_lines
   tags: verify
 
 - name: Verify Calico node status
