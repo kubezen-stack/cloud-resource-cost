@@ -111,6 +111,13 @@ grafana:
     limits:
       cpu: 300m
       memory: 512Mi
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      labelValue: "1"
+      folder: /var/lib/grafana/dashboards/dev
+      searchNamespace: monitoring
   datasources:
     datasources.yaml:
       apiVersion: 1
@@ -124,6 +131,11 @@ grafana:
           type: loki
           url: http://monitoring-loki:3100
           access: proxy
+
+customDashboards:
+  dev-app-health: dashboards/dev-app-health.json
+  dev-api-requests: dashboards/dev-api-requests.json
+  dev-logs: dashboards/dev-logs.json
 
 alertmanager:
   enabled: false

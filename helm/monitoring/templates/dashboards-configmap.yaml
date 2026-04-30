@@ -1,0 +1,14 @@
+{{- range $name, $path := .Values.customDashboards }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-{{ $name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    grafana_dashboard: "1"
+    {{- include "monitoring.labels" $ | nindent 4 }}
+data:
+  {{ $name }}.json: |
+    {{- $.Files.Get $path | nindent 4 }}
+{{- end }}
