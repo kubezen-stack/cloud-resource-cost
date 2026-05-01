@@ -68,13 +68,12 @@ jobs:
         id: get_ssh_key
         run: |
           mkdir -p /home/runner/.ssh
-          
+
           aws secretsmanager get-secret-value \
             --secret-id ${{ steps.tf_outputs.outputs.ssh_secret }} \
             --query SecretString \
             --output text \
-          | jq -r '.private_key' \
-          | sed 's/\\n/\n/g' > /home/runner/.ssh/deploy_key.pem
+          | jq -r '.private_key' > /home/runner/.ssh/deploy_key.pem
 
           chmod 600 /home/runner/.ssh/deploy_key.pem
           echo "private_key=/home/runner/.ssh/deploy_key.pem" >> $GITHUB_OUTPUT
