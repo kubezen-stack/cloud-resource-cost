@@ -103,7 +103,7 @@
     content: |
       {
         "credHelpers": {
-          "{{ ecr_registry_url.stdout }}": "ecr-login"
+          "{{ ecr_registry_url }}": "ecr-login"
         }
       }
     mode: "0600"
@@ -115,7 +115,7 @@
     content: |
       {
         "credHelpers": {
-          "{{ ecr_registry_url.stdout }}": "ecr-login"
+          "{{ ecr_registry_url }}": "ecr-login"
         }
       }
     owner: ubuntu
@@ -125,7 +125,7 @@
 
 - name: Create ECR registry directory
   ansible.builtin.file:
-    path: "/etc/containerd/certs.d/{{ ecr_registry_url.stdout }}"
+    path: "/etc/containerd/certs.d/{{ ecr_registry_url }}"
     state: directory
     mode: "0755"
   notify: restarted containerd
@@ -133,10 +133,10 @@
 
 - name: Create ECR hosts.toml
   ansible.builtin.copy:
-    dest: "/etc/containerd/certs.d/{{ ecr_registry_url.stdout }}/hosts.toml"
+    dest: "/etc/containerd/certs.d/{{ ecr_registry_url }}/hosts.toml"
     content: |
-      server = "https://{{ ecr_registry_url.stdout }}"
-      [host."https://{{ ecr_registry_url.stdout }}"]
+      server = "https://{{ ecr_registry_url }}"
+      [host."https://{{ ecr_registry_url }}"]
         capabilities = ["pull", "resolve"]
   notify: restarted containerd
   tags: containerd

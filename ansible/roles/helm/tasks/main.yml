@@ -85,7 +85,7 @@
 - name: Create imagePullSecret in Kubernetes
   ansible.builtin.shell: |
     kubectl create secret docker-registry ecr-secret \
-      --docker-server={{ ecr_registry_url.stdout }} \
+      --docker-server={{ ecr_registry_url }} \
       --docker-username=AWS \
       --docker-password={{ ecr_token.stdout }} \
       --namespace cost-optimizer \
