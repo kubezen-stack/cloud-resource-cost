@@ -94,11 +94,12 @@ jobs:
         id: tf_outputs
         working-directory: terraform/environments/${{ env.ENVIRONMENT }}
         run: |
-          ECR_URL=$(terraform output -raw ecr_repository_url 2>/dev/null)
+          ECR_URL=$(terraform output -raw ecr_repository_url 2>/dev/null | tail -n1)
           echo "ECR_URL is: ${ECR_URL}"
           echo "ecr_url=${ECR_URL}" >> $GITHUB_OUTPUT
         env:
           TF_PLUGIN_CACHE_DIR: ~/.terraform.d/plugin-cache
+          TF_CLI_ARGS: "-no-color"
 
       - name: Login to ECR
         id: login-ecr
@@ -272,11 +273,14 @@ jobs:
         id: ecr
         run: |
           cd terraform/environments/${{ env.ENVIRONMENT }}
-          terraform init -input=false
-          ECR_URL=$(terraform output -raw ecr_repository_url 2>/dev/null)
+          mkdir -p ~/.terraform.d/plugin-cache
+          export TF_PLUGIN_CACHE_DIR=~/.terraform.d/plugin-cache
+          terraform init -input=false -no-color 2>/dev/null
+          ECR_URL=$(terraform output -raw ecr_repository_url 2>/dev/null | tail -n1)
           echo "ecr_url=${ECR_URL}" >> $GITHUB_OUTPUT
         env:
           TF_PLUGIN_CACHE_DIR: ~/.terraform.d/plugin-cache
+          TF_CLI_ARGS: "-no-color"
 
       - name: Get kubeconfig from Secrets Manager
         run: |
