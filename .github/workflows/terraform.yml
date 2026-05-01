@@ -64,23 +64,23 @@ jobs:
           terraform_version: ${{ env.TF_VERSION }}
           terraform_wrapper: false
 
+      - name: Create Terraform plugin cache dir
+        run: mkdir -p $HOME/.terraform.d/plugin-cache
+
       - name: Cache Terraform plugins
         uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         with:
           path: |
-            ~/.terraform.d/plugin-cache
+            ${{ env.HOME }}/.terraform.d/plugin-cache
             ${{ env.WORKING_DIR }}/.terraform
           key: terraform-${{ env.TARGET_ENV }}-${{ hashFiles('**/*.tf', '**/*.tfvars') }}
           restore-keys: |
             terraform-${{ env.TARGET_ENV }}-
 
-      - name: Create Terraform plugin cache dir
-        run: mkdir -p ~/.terraform.d/plugin-cache
-
       - name: Terraform Init
-        run: terraform init -input=false
+        run: terraform init -input=false -migrate-state
         env:
-          TF_PLUGIN_CACHE_DIR: ~/.terraform.d/plugin-cache
+          TF_PLUGIN_CACHE_DIR: $HOME/.terraform.d/plugin-cache
 
       - name: Terraform format
         run: terraform fmt -check -recursive -diff
@@ -97,7 +97,7 @@ jobs:
           -input=false \
           -lock=true
         env:
-          TF_PLUGIN_CACHE_DIR: ~/.terraform.d/plugin-cache
+          TF_PLUGIN_CACHE_DIR: $HOME/.terraform.d/plugin-cache
 
       - name: Upload Terraform Plan
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
@@ -135,12 +135,22 @@ jobs:
           terraform_wrapper: false
 
       - name: Create Terraform plugin cache dir
-        run: mkdir -p ~/.terraform.d/plugin-cache
+        run: mkdir -p $HOME/.terraform.d/plugin-cache
+
+      - name: Cache Terraform plugins
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: |
+            ${{ env.HOME }}/.terraform.d/plugin-cache
+            ${{ env.WORKING_DIR }}/.terraform
+          key: terraform-${{ env.TARGET_ENV }}-${{ hashFiles('**/*.tf', '**/*.tfvars') }}
+          restore-keys: |
+            terraform-${{ env.TARGET_ENV }}-
 
       - name: Terraform Init
-        run: terraform init -input=false
+        run: terraform init -input=false -migrate-state
         env:
-          TF_PLUGIN_CACHE_DIR: ~/.terraform.d/plugin-cache
+          TF_PLUGIN_CACHE_DIR: $HOME/.terraform.d/plugin-cache
 
       - name: Download Plan
         uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
@@ -151,12 +161,12 @@ jobs:
       - name: Terraform Apply
         run: terraform apply -auto-approve tfplan-${{ env.TARGET_ENV }}
         env:
-          TF_PLUGIN_CACHE_DIR: ~/.terraform.d/plugin-cache
+          TF_PLUGIN_CACHE_DIR: $HOME/.terraform.d/plugin-cache
 
       - name: Save Terraform Outputs
         id: tf_outputs
         run: |
-          echo "ecr_url=$(terraform output -raw ecr_repository_url 2>/dev/null)" >> $GITHUB_OUTPUT
+          echo "ecr_url=$(terraform output -raw ecr_repository_url 2>/dev/null | tail -n1)" >> $GITHUB_OUTPUT
 
       - name: Update GitHub Env
         run: |
@@ -190,12 +200,22 @@ jobs:
           terraform_wrapper: false
 
       - name: Create Terraform plugin cache dir
-        run: mkdir -p ~/.terraform.d/plugin-cache
+        run: mkdir -p $HOME/.terraform.d/plugin-cache
+
+      - name: Cache Terraform plugins
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: |
+            ${{ env.HOME }}/.terraform.d/plugin-cache
+            ${{ env.WORKING_DIR }}/.terraform
+          key: terraform-${{ env.TARGET_ENV }}-${{ hashFiles('**/*.tf', '**/*.tfvars') }}
+          restore-keys: |
+            terraform-${{ env.TARGET_ENV }}-
 
       - name: Terraform Init
-        run: terraform init -input=false
+        run: terraform init -input=false -migrate-state
         env:
-          TF_PLUGIN_CACHE_DIR: ~/.terraform.d/plugin-cache
+          TF_PLUGIN_CACHE_DIR: $HOME/.terraform.d/plugin-cache
 
       - name: Terraform Destroy
         run: |
@@ -205,4 +225,4 @@ jobs:
           -input=false \
           -lock=false
         env:
-          TF_PLUGIN_CACHE_DIR: ~/.terraform.d/plugin-cache
+          TF_PLUGIN_CACHE_DIR: $HOME/.terraform.d/plugin-cache
