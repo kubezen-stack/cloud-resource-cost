@@ -13,7 +13,6 @@ enable_monitoring  = false
 enable_kubernetes  = false
 kubernetes_version = "1.28"
 ssh_access_cidr    = ["0.0.0.0/0"]
-ssh_key_path       = ""
 create_alb         = false
 
 enable_rds              = false
