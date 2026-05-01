@@ -121,11 +121,6 @@ jobs:
           python3 -m pip install ansible-core boto3 botocore kubernetes
           ansible-galaxy collection install -r ansible/requirements.yml -p ./ansible/collections --force
 
-      - name: Update ansible ssh key path
-        run: |
-          sed -i "s|ansible_ssh_private_key_file:.*|ansible_ssh_private_key_file: ${{ steps.get_ssh_key.outputs.private_key }}|" \
-            ansible/inventory/${{github.event.inputs.environment}}/group_vars/all.yml
-
       - name: Run Ansible playbook
         working-directory: ansible
         env:
