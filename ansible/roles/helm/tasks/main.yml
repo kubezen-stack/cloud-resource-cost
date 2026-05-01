@@ -51,10 +51,21 @@
   tags: cleanup
 
 - name: Get ECR registry URL
-  ansible.builtin.set_fact:
-    ecr_registry_url: "{{ ecr_registry_url | default(lookup('ansible.builtin.shell', 'aws ecr describe-repositories --repository-names "cost-optimizer-'${target_env}'" --query repositories[0].repositoryUri --output text | cut -d/ -f1')) }}"
-  tags: ecr_secret
+  ansible.builtin.shell: |
+    aws ecr describe-repositories \
+      --repository-names "cost-optimizer-{{ target_env }}" \
+      --query "repositories[0].repositoryUri" \
+      --output text | cut -d'/' -f1
+  register: ecr_registry_url_result
+  changed_when: false
   when: ecr_registry_url is not defined
+  tags: ecr_secret
+
+- name: Set ECR registry URL fact
+  ansible.builtin.set_fact:
+    ecr_registry_url: "{{ ecr_registry_url_result.stdout }}"
+  when: ecr_registry_url is not defined
+  tags: ecr_secret
 
 - name: Get ECR authorization token
   ansible.builtin.shell: |
