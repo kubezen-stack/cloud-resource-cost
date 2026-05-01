@@ -53,7 +53,7 @@ jobs:
     environment: "${{ github.event.inputs.environment || 'dev' }}"
     outputs:
       image_tag: ${{ steps.image_tag.outputs.TAG }}
-      ecr_url: ${{ steps.tf_outputs.outputs.ecr_url }}
+      ecr_url: ${{ steps.ecr.outputs.ecr_url }}
     steps:
       - name: Checkout code
         uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
@@ -69,7 +69,7 @@ jobs:
         uses: actions/cache@a7833574556fa59680c1b7cb190c1735db73ebf0 # v5.0.0
         with:
           path: |
-            ~/.terraform.d/plugin-cache
+            ${{ github.workspace }}/.terraform_cache
             terraform/environments/${{ env.ENVIRONMENT }}/.terraform
           key: terraform-${{ env.ENVIRONMENT }}-${{ hashFiles('terraform/environments/${{ env.ENVIRONMENT }}/.terraform.lock.hcl') }}
           restore-keys: |
@@ -82,23 +82,22 @@ jobs:
           terraform_wrapper: false
 
       - name: Create Terraform plugin cache dir
-        run: mkdir -p ~/.terraform.d/plugin-cache
+        run: mkdir -p ${{ github.workspace }}/.terraform_cache
 
       - name: Terraform Init
         working-directory: terraform/environments/${{ env.ENVIRONMENT }}
         run: terraform init -input=false -reconfigure
         env:
-          TF_PLUGIN_CACHE_DIR: /home/runner/.terraform.d/plugin-cache
+          TF_PLUGIN_CACHE_DIR: ${{ github.workspace }}/.terraform_cache
 
       - name: Get ECR URL from terraform
-        id: tf_outputs
+        id: ecr
         working-directory: terraform/environments/${{ env.ENVIRONMENT }}
         run: |
           ECR_URL=$(terraform output -raw ecr_repository_url 2>/dev/null | tail -n1)
           echo "ecr_url=${ECR_URL}" >> $GITHUB_OUTPUT
         env:
-          TF_PLUGIN_CACHE_DIR: /home/runner/.terraform.d/plugin-cache
-          TF_CLI_ARGS: "-no-color"
+          TF_PLUGIN_CACHE_DIR: ${{ github.workspace }}/.terraform_cache
 
       - name: Login to ECR
         id: login-ecr
@@ -123,14 +122,14 @@ jobs:
           --cache-from type=gha \
           --cache-to type=gha,mode=max \
           -f docker/Dockerfile \
-          -t ${{ steps.tf_outputs.outputs.ecr_url }}:${{ steps.image_tag.outputs.TAG }} \
-          -t ${{ steps.tf_outputs.outputs.ecr_url }}:${{ env.ENVIRONMENT }} \
+          -t ${{ steps.ecr.outputs.ecr_url }}:${{ steps.image_tag.outputs.TAG }} \
+          -t ${{ steps.ecr.outputs.ecr_url }}:${{ env.ENVIRONMENT }} \
           --load .
 
       - name: Run Trivy scanner
         uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
         with:
-          image-ref: "${{ steps.tf_outputs.outputs.ecr_url }}:${{ steps.image_tag.outputs.TAG }}"
+          image-ref: "${{ steps.ecr.outputs.ecr_url }}:${{ steps.image_tag.outputs.TAG }}"
           format: 'json'
           output: 'trivy-results.json'
           severity: 'CRITICAL,HIGH'
@@ -144,8 +143,8 @@ jobs:
 
       - name: Push Docker Image
         run: |
-          docker push ${{ steps.tf_outputs.outputs.ecr_url }}:${{ steps.image_tag.outputs.TAG }}
-          docker push ${{ steps.tf_outputs.outputs.ecr_url }}:${{ env.ENVIRONMENT }}
+          docker push ${{ steps.ecr.outputs.ecr_url }}:${{ steps.image_tag.outputs.TAG }}
+          docker push ${{ steps.ecr.outputs.ecr_url }}:${{ env.ENVIRONMENT }}
 
   run-tests:
     name: "Run Tests"
@@ -259,14 +258,14 @@ jobs:
         uses: actions/cache@a7833574556fa59680c1b7cb190c1735db73ebf0 # v5.0.0
         with:
           path: |
-            ~/.terraform.d/plugin-cache
+            ${{ github.workspace }}/.terraform_cache
             terraform/environments/${{ env.ENVIRONMENT }}/.terraform
           key: terraform-${{ env.ENVIRONMENT }}-${{ hashFiles('terraform/environments/${{ env.ENVIRONMENT }}/.terraform.lock.hcl') }}
           restore-keys: |
             terraform-${{ env.ENVIRONMENT }}-
 
       - name: Create Terraform plugin cache dir
-        run: mkdir -p /home/runner/.terraform.d/plugin-cache
+        run: mkdir -p ${{ github.workspace }}/.terraform_cache
 
       - name: Get ECR URL from terraform
         id: ecr
@@ -276,7 +275,7 @@ jobs:
           ECR_URL=$(terraform output -raw ecr_repository_url 2>/dev/null | tail -n1)
           echo "ecr_url=${ECR_URL}" >> $GITHUB_OUTPUT
         env:
-          TF_PLUGIN_CACHE_DIR: /home/runner/.terraform.d/plugin-cache
+          TF_PLUGIN_CACHE_DIR: ${{ github.workspace }}/.terraform_cache
 
       - name: Get kubeconfig from Secrets Manager
         run: |
