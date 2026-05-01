@@ -1,6 +1,6 @@
 from typing import Annotated, Optional
 from datetime import datetime, timedelta
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 import uuid as uuid_pkg
@@ -13,9 +13,9 @@ from app.services.cost_service import AWSCostService
 
 router = APIRouter()
 
-@router.get("/{account_id}/costs")
+@router.get("/{aws_account_id}/costs")
 async def get_account_costs(
-    account_id: uuid_pkg.UUID,
+    aws_account_id: Annotated[str, Path(description="AWS Account ID (12 digits)", min_length=12, max_length=12)],
     start_date: Annotated[Optional[str], Query(description="Start date (YYYY-MM-DD)")] = None,
     end_date: Annotated[Optional[str], Query(description="End date (YYYY-MM-DD)")] = None,
     granularity: Annotated[str, Query(description="DAILY, MONTHLY, or HOURLY")] = "DAILY",
@@ -27,7 +27,7 @@ async def get_account_costs(
     
     result = await db.execute(
         select(AWSaccount).where(
-            AWSaccount.id == account_id,
+            AWSaccount.aws_account_id == aws_account_id,
             AWSaccount.user_id == current_user.id
         )
     )
@@ -60,7 +60,7 @@ async def get_account_costs(
         )
         
         return {
-            "account_id": str(account_id),
+            "aws_account_id": aws_account_id,
             "account_name": account.aws_account_name,
             "start_date": start_date,
             "end_date": end_date,
@@ -78,9 +78,9 @@ async def get_account_costs(
             detail=f"Failed to fetch costs: {str(e)}"
         )
     
-@router.get("/{account_id}/forecast")
+@router.get("/{aws_account_id}/forecast")
 async def get_cost_forecast(
-    account_id: uuid_pkg.UUID,
+    aws_account_id: Annotated[str, Path(description="AWS Account ID (12 digits)", min_length=12, max_length=12)],
     start_date: Annotated[Optional[str], Query(description="Start date (YYYY-MM-DD)")] = None,
     end_date: Annotated[Optional[str], Query(description="End date (YYYY-MM-DD)")] = None,
     current_user: Annotated[User, Depends(get_current_user)] = None,
@@ -90,7 +90,7 @@ async def get_cost_forecast(
     
     result = await db.execute(
         select(AWSaccount).where(
-            AWSaccount.id == account_id,
+            AWSaccount.aws_account_id == aws_account_id,
             AWSaccount.user_id == current_user.id
         )
     )
@@ -119,7 +119,7 @@ async def get_cost_forecast(
         )
         
         return {
-            "account_id": str(account_id),
+            "aws_account_id": aws_account_id,
             "account_name": account.aws_account_name,
             "start_date": start_date,
             "end_date": end_date,
@@ -136,9 +136,9 @@ async def get_cost_forecast(
             detail=f"Failed to fetch forecast: {str(e)}"
         )
 
-@router.get("/{account_id}/breakdown")
+@router.get("/{aws_account_id}/breakdown")
 async def get_cost_breakdown(
-    account_id: uuid_pkg.UUID,
+    aws_account_id: Annotated[str, Path(description="AWS Account ID (12 digits)", min_length=12, max_length=12)],
     start_date: Annotated[Optional[str], Query()] = None,
     end_date: Annotated[Optional[str], Query()] = None,
     current_user: Annotated[User, Depends(get_current_user)] = None,
@@ -148,7 +148,7 @@ async def get_cost_breakdown(
     
     result = await db.execute(
         select(AWSaccount).where(
-            AWSaccount.id == account_id,
+            AWSaccount.aws_account_id == aws_account_id,
             AWSaccount.user_id == current_user.id
         )
     )
@@ -196,7 +196,7 @@ async def get_cost_breakdown(
         )
         
         return {
-            "account_id": str(account_id),
+            "aws_account_id": aws_account_id,
             "account_name": account.aws_account_name,
             "period": f"{start_date} to {end_date}",
             "breakdown": [

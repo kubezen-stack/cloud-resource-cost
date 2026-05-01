@@ -51,10 +51,17 @@ async def get_aws_accounts(current_user: Annotated[User, Depends(get_current_use
     accounts = result.scalars().all()
     return accounts
 
-@router.get('/{account_id}', response_model=AWSAccountResponse)
-async def get_aws_account(account_id: uuid_pkg.UUID, current_user: Annotated[User, Depends(get_current_user)], db: Annotated[AsyncSession, Depends(get_db)]):
+@router.get('/{aws_account_id}', response_model=AWSAccountResponse)
+async def get_aws_account(
+    aws_account_id: str, 
+    current_user: Annotated[User, Depends(get_current_user)], 
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
     result = await db.execute(
-        select(AWSaccount).where(AWSaccount.id == account_id).where(AWSaccount.user_id == current_user.id)
+        select(AWSaccount).where(
+            AWSaccount.aws_account_id == aws_account_id,
+            AWSaccount.user_id == current_user.id
+        )
     )
     account = result.scalar_one_or_none()
     if not account:
