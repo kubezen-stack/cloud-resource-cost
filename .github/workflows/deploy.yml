@@ -86,19 +86,18 @@ jobs:
 
       - name: Terraform Init
         working-directory: terraform/environments/${{ env.ENVIRONMENT }}
-        run: terraform init -input=false
+        run: terraform init -input=false -reconfigure
         env:
-          TF_PLUGIN_CACHE_DIR: ~/.terraform.d/plugin-cache
+          TF_PLUGIN_CACHE_DIR: /home/runner/.terraform.d/plugin-cache
 
       - name: Get ECR URL from terraform
         id: tf_outputs
         working-directory: terraform/environments/${{ env.ENVIRONMENT }}
         run: |
           ECR_URL=$(terraform output -raw ecr_repository_url 2>/dev/null | tail -n1)
-          echo "ECR_URL is: ${ECR_URL}"
           echo "ecr_url=${ECR_URL}" >> $GITHUB_OUTPUT
         env:
-          TF_PLUGIN_CACHE_DIR: ~/.terraform.d/plugin-cache
+          TF_PLUGIN_CACHE_DIR: /home/runner/.terraform.d/plugin-cache
           TF_CLI_ARGS: "-no-color"
 
       - name: Login to ECR
@@ -267,20 +266,17 @@ jobs:
             terraform-${{ env.ENVIRONMENT }}-
 
       - name: Create Terraform plugin cache dir
-        run: mkdir -p ~/.terraform.d/plugin-cache
+        run: mkdir -p /home/runner/.terraform.d/plugin-cache
 
       - name: Get ECR URL from terraform
         id: ecr
+        working-directory: terraform/environments/${{ env.ENVIRONMENT }}
         run: |
-          cd terraform/environments/${{ env.ENVIRONMENT }}
-          mkdir -p ~/.terraform.d/plugin-cache
-          export TF_PLUGIN_CACHE_DIR=~/.terraform.d/plugin-cache
-          terraform init -input=false -no-color 2>/dev/null
+          terraform init -input=false -reconfigure
           ECR_URL=$(terraform output -raw ecr_repository_url 2>/dev/null | tail -n1)
           echo "ecr_url=${ECR_URL}" >> $GITHUB_OUTPUT
         env:
-          TF_PLUGIN_CACHE_DIR: ~/.terraform.d/plugin-cache
-          TF_CLI_ARGS: "-no-color"
+          TF_PLUGIN_CACHE_DIR: /home/runner/.terraform.d/plugin-cache
 
       - name: Get kubeconfig from Secrets Manager
         run: |

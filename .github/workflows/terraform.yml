@@ -71,7 +71,7 @@ jobs:
         uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         with:
           path: |
-            ${{ env.HOME }}/.terraform.d/plugin-cache
+            ~/.terraform.d/plugin-cache
             ${{ env.WORKING_DIR }}/.terraform
           key: terraform-${{ env.TARGET_ENV }}-${{ hashFiles('**/*.tf', '**/*.tfvars') }}
           restore-keys: |
@@ -80,7 +80,7 @@ jobs:
       - name: Terraform Init
         run: terraform init -input=false -migrate-state
         env:
-          TF_PLUGIN_CACHE_DIR: $HOME/.terraform.d/plugin-cache
+          TF_PLUGIN_CACHE_DIR: /home/runner/.terraform.d/plugin-cache
 
       - name: Terraform format
         run: terraform fmt -check -recursive -diff
@@ -97,7 +97,7 @@ jobs:
           -input=false \
           -lock=true
         env:
-          TF_PLUGIN_CACHE_DIR: $HOME/.terraform.d/plugin-cache
+          TF_PLUGIN_CACHE_DIR: /home/runner/.terraform.d/plugin-cache
 
       - name: Upload Terraform Plan
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
@@ -141,7 +141,7 @@ jobs:
         uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         with:
           path: |
-            ${{ env.HOME }}/.terraform.d/plugin-cache
+            ~/.terraform.d/plugin-cache
             ${{ env.WORKING_DIR }}/.terraform
           key: terraform-${{ env.TARGET_ENV }}-${{ hashFiles('**/*.tf', '**/*.tfvars') }}
           restore-keys: |
@@ -150,7 +150,7 @@ jobs:
       - name: Terraform Init
         run: terraform init -input=false -migrate-state
         env:
-          TF_PLUGIN_CACHE_DIR: $HOME/.terraform.d/plugin-cache
+          TF_PLUGIN_CACHE_DIR: /home/runner/.terraform.d/plugin-cache
 
       - name: Download Plan
         uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
@@ -161,7 +161,7 @@ jobs:
       - name: Terraform Apply
         run: terraform apply -auto-approve tfplan-${{ env.TARGET_ENV }}
         env:
-          TF_PLUGIN_CACHE_DIR: $HOME/.terraform.d/plugin-cache
+          TF_PLUGIN_CACHE_DIR: /home/runner/.terraform.d/plugin-cache
 
       - name: Save Terraform Outputs
         id: tf_outputs
@@ -206,7 +206,7 @@ jobs:
         uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         with:
           path: |
-            ${{ env.HOME }}/.terraform.d/plugin-cache
+            ~/.terraform.d/plugin-cache
             ${{ env.WORKING_DIR }}/.terraform
           key: terraform-${{ env.TARGET_ENV }}-${{ hashFiles('**/*.tf', '**/*.tfvars') }}
           restore-keys: |
@@ -215,7 +215,7 @@ jobs:
       - name: Terraform Init
         run: terraform init -input=false -migrate-state
         env:
-          TF_PLUGIN_CACHE_DIR: $HOME/.terraform.d/plugin-cache
+          TF_PLUGIN_CACHE_DIR: /home/runner/.terraform.d/plugin-cache
 
       - name: Terraform Destroy
         run: |
@@ -225,4 +225,4 @@ jobs:
           -input=false \
           -lock=false
         env:
-          TF_PLUGIN_CACHE_DIR: $HOME/.terraform.d/plugin-cache
+          TF_PLUGIN_CACHE_DIR: /home/runner/.terraform.d/plugin-cache
