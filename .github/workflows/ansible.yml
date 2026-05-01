@@ -133,7 +133,7 @@ jobs:
             playbooks/${{ github.event.inputs.playbook }} \
             --private-key ${{ steps.get_ssh_key.outputs.private_key }} \
             --extra-vars "github_pat=${RUNNER_PAT} target_env=${RUNNER_ENV} token=${{ secrets.K3S_TOKEN }}" \
-            -v \
+            -vvvv \
             -f 10
 
       - name: Get master instance IP
