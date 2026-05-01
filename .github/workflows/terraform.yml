@@ -62,7 +62,7 @@ jobs:
         uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
         with:
           terraform_version: ${{ env.TF_VERSION }}
-
+          terraform_wrapper: false
 
       - name: Cache Terraform plugins
         uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
@@ -73,7 +73,9 @@ jobs:
           key: terraform-${{ env.TARGET_ENV }}-${{ hashFiles('**/*.tf', '**/*.tfvars') }}
           restore-keys: |
             terraform-${{ env.TARGET_ENV }}-
-            terraform-${{ env.TARGET_ENV }}
+
+      - name: Create Terraform plugin cache dir
+        run: mkdir -p ~/.terraform.d/plugin-cache
 
       - name: Terraform Init
         run: terraform init -input=false
@@ -94,8 +96,10 @@ jobs:
           -out=tfplan-${{ env.TARGET_ENV }} \
           -input=false \
           -lock=true
+        env:
+          TF_PLUGIN_CACHE_DIR: ~/.terraform.d/plugin-cache
 
-      - name: Terraform Upload Plan
+      - name: Upload Terraform Plan
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: tfplan-${{ env.TARGET_ENV }}
@@ -107,12 +111,11 @@ jobs:
     runs-on: "ubuntu-latest"
     environment: "${{ github.event.inputs.environment || 'dev' }}"
     if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply' }}
+    needs: terraform-plan
 
     defaults:
       run:
         working-directory: ${{ env.WORKING_DIR }}
-
-    needs: terraform-plan
 
     steps:
       - name: Checkout
@@ -129,9 +132,15 @@ jobs:
         uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
         with:
           terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Create Terraform plugin cache dir
+        run: mkdir -p ~/.terraform.d/plugin-cache
 
       - name: Terraform Init
-        run: terraform init
+        run: terraform init -input=false
+        env:
+          TF_PLUGIN_CACHE_DIR: ~/.terraform.d/plugin-cache
 
       - name: Download Plan
         uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
@@ -141,20 +150,22 @@ jobs:
 
       - name: Terraform Apply
         run: terraform apply -auto-approve tfplan-${{ env.TARGET_ENV }}
+        env:
+          TF_PLUGIN_CACHE_DIR: ~/.terraform.d/plugin-cache
 
       - name: Save Terraform Outputs
         id: tf_outputs
         run: |
-          echo "ecr_url=$(terraform output -raw ecr_repository_url)" >> $GITHUB_OUTPUT
+          echo "ecr_url=$(terraform output -raw ecr_repository_url 2>/dev/null)" >> $GITHUB_OUTPUT
 
-      - name: Update Github Output
+      - name: Update GitHub Env
         run: |
           echo "ECR_REPOSITORY_URL=${{ steps.tf_outputs.outputs.ecr_url }}" >> $GITHUB_ENV
 
   terraform-destroy:
     name: "Terraform Destroy"
     runs-on: "ubuntu-latest"
-    environment: "${{ github.event.inputs.environment}}"
+    environment: "${{ github.event.inputs.environment }}"
     if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'destroy' }}
 
     defaults:
@@ -176,9 +187,15 @@ jobs:
         uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
         with:
           terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Create Terraform plugin cache dir
+        run: mkdir -p ~/.terraform.d/plugin-cache
 
       - name: Terraform Init
         run: terraform init -input=false
+        env:
+          TF_PLUGIN_CACHE_DIR: ~/.terraform.d/plugin-cache
 
       - name: Terraform Destroy
         run: |
@@ -187,3 +204,5 @@ jobs:
           -auto-approve \
           -input=false \
           -lock=false
+        env:
+          TF_PLUGIN_CACHE_DIR: ~/.terraform.d/plugin-cache

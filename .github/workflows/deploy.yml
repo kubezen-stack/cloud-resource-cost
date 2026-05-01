@@ -81,6 +81,9 @@ jobs:
           terraform_version: ${{ env.TF_VERSION }}
           terraform_wrapper: false
 
+      - name: Create Terraform plugin cache dir
+        run: mkdir -p ~/.terraform.d/plugin-cache
+
       - name: Terraform Init
         working-directory: terraform/environments/${{ env.ENVIRONMENT }}
         run: terraform init -input=false
@@ -91,7 +94,7 @@ jobs:
         id: tf_outputs
         working-directory: terraform/environments/${{ env.ENVIRONMENT }}
         run: |
-          ECR_URL=$(terraform output -raw ecr_repository_url)
+          ECR_URL=$(terraform output -raw ecr_repository_url 2>/dev/null)
           echo "ECR_URL is: ${ECR_URL}"
           echo "ecr_url=${ECR_URL}" >> $GITHUB_OUTPUT
         env:
@@ -262,12 +265,15 @@ jobs:
           restore-keys: |
             terraform-${{ env.ENVIRONMENT }}-
 
+      - name: Create Terraform plugin cache dir
+        run: mkdir -p ~/.terraform.d/plugin-cache
+
       - name: Get ECR URL from terraform
         id: ecr
         run: |
           cd terraform/environments/${{ env.ENVIRONMENT }}
           terraform init -input=false
-          ECR_URL=$(terraform output -raw ecr_repository_url)
+          ECR_URL=$(terraform output -raw ecr_repository_url 2>/dev/null)
           echo "ecr_url=${ECR_URL}" >> $GITHUB_OUTPUT
         env:
           TF_PLUGIN_CACHE_DIR: ~/.terraform.d/plugin-cache
