@@ -24,7 +24,7 @@ def upgrade() -> None:
     op.add_column('aws_accounts', sa.Column('last_validated_at', sa.DateTime(), nullable=True))
     op.add_column('aws_accounts', sa.Column('last_validation_error', sa.String(), nullable=True))
     op.create_unique_constraint('uq_user_aws_account', 'aws_accounts', ['user_id', 'aws_account_id'])
-    op.drop_index('ix_cost_services_aws_account_account_date', table_name='cost_services')
+    op.drop_index('ix_cost_services_aws_account_date', table_name='cost_services')
     op.create_index('ix_cost_services_aws_account_date', 'cost_services', ['aws_account_id', 'recorded_at'], unique=False)
     # ### end Alembic commands ###
 
