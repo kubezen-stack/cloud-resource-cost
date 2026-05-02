@@ -1,4 +1,4 @@
-import datetime
+from datetime import datetime, timezone
 from typing import Annotated, List
 from fastapi import APIRouter, Depends, HTTPException, status
 import uuid as uuid_pkg
@@ -53,7 +53,7 @@ async def connect_aws_account(account_data: AWSCreateAccount,
         aws_account_id=account_data.aws_account_id,
         role_arn=account_data.role_arn,
         external_id=external_id,
-        last_validated_at=datetime.utcnow(),
+        last_validated_at=datetime.now(timezone.utc),
         last_validation_error=None
     )
     db.add(new_account)
