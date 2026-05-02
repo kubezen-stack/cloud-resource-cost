@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, ForeignKey, String, DateTime
+from sqlalchemy import Boolean, Column, ForeignKey, String, DateTime, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from app.core.database import Base
 import uuid
@@ -14,5 +14,11 @@ class AWSaccount(Base):
     role_arn = Column(String, nullable=False, unique=True)
     external_id = Column(String, nullable=True)
     is_active = Column(Boolean, default=True)
+    last_validated_at = Column(DateTime, nullable=True)
+    last_validation_error = Column(String, nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=True, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint('user_id', 'aws_account_id', name='uq_user_aws_account'),
+    )

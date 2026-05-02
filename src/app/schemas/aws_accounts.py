@@ -21,6 +21,8 @@ class AWSAccountResponse(AWSAccountBase):
     user_id: uuid.UUID
     external_id: str
     is_active: bool
+    last_validated_at: Optional[datetime] = None
+    last_validation_error: Optional[str] = None
     created_at: datetime
 
 class ServiceCostItem(BaseModel):
