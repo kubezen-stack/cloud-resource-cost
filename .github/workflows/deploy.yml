@@ -152,6 +152,8 @@ jobs:
     environment: "${{ github.event.inputs.environment || 'dev' }}"
     needs: helm-deploy-dev
     if: ${{ github.event.inputs.environment == 'dev' || github.event_name == 'push' }}
+    env:
+      KUBECONFIG: /home/ubuntu/.kube/config
     steps:
       - name: Checkout code
         uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
@@ -169,11 +171,13 @@ jobs:
             --secret-id "cost-optimizer-dev-kubeconfig" \
             --query SecretString \
             --output text)
-          mkdir -p ~/.kube
-          echo "$KUBECONFIG_DATA" > ~/.kube/config
-          chmod 600 ~/.kube/config
+          mkdir -p /home/ubuntu/.kube
+          echo "$KUBECONFIG_DATA" > /home/ubuntu/.kube/config
+          chmod 600 /home/ubuntu/.kube/config
 
       - name: Wait for app to be ready
+        env:
+          KUBECONFIG: /home/ubuntu/.kube/config
         run: |
           kubectl wait --for=condition=ready pod \
             -l app.kubernetes.io/name=cost-optimizer \
@@ -236,6 +240,8 @@ jobs:
     environment: "${{ github.event.inputs.environment || 'dev' }}"
     needs: [build-and-push, sonarcloud]
     if: ${{ github.event.inputs.environment == 'dev' || github.event_name == 'push' }}
+    env:
+      KUBECONFIG: /home/ubuntu/.kube/config
     steps:
     
       - name: Checkout code
@@ -283,9 +289,9 @@ jobs:
             --secret-id "cost-optimizer-dev-kubeconfig" \
             --query SecretString \
             --output text)
-          mkdir -p ~/.kube
-          echo "$KUBECONFIG_DATA" > ~/.kube/config
-          chmod 600 ~/.kube/config
+          mkdir -p /home/ubuntu/.kube
+          echo "$KUBECONFIG_DATA" > /home/ubuntu/.kube/config
+          chmod 600 /home/ubuntu/.kube/config
 
       - name: Setup kubectl
         uses: azure/setup-kubectl@15650b3ad78fff148532a140b8a4c821796b2d7b # v5.0.0
@@ -338,6 +344,8 @@ jobs:
     environment: "${{ github.event.inputs.environment || 'dev' }}"
     needs: helm-deploy-dev
     if: ${{ github.event.inputs.environment == 'dev' || github.event_name == 'push' }}
+    env:
+      KUBECONFIG: /home/ubuntu/.kube/config
     steps:
       - name: Checkout code
         uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
@@ -361,9 +369,9 @@ jobs:
             --secret-id "cost-optimizer-dev-kubeconfig" \
             --query SecretString \
             --output text)
-          mkdir -p ~/.kube
-          echo "$KUBECONFIG_DATA" > ~/.kube/config
-          chmod 600 ~/.kube/config
+          mkdir -p /home/ubuntu/.kube
+          echo "$KUBECONFIG_DATA" > /home/ubuntu/.kube/config
+          chmod 600 /home/ubuntu/.kube/config
 
       - name: Setup Helm
         uses: azure/setup-helm@dda3372f752e03dde6b3237bc9431cdc2f7a02a2 # v5.0.0
@@ -396,6 +404,8 @@ jobs:
     environment: "${{ github.event.inputs.environment || 'dev' }}"
     needs: helm-deploy-monitoring-dev
     if: ${{ github.event.inputs.environment == 'dev' || github.event_name == 'push' }}
+    env:
+      KUBECONFIG: /home/ubuntu/.kube/config
     steps:
     - name: Checkout code
       uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
@@ -413,9 +423,9 @@ jobs:
           --secret-id "cost-optimizer-dev-kubeconfig" \
           --query SecretString \
           --output text)
-        mkdir -p ~/.kube
-        echo "$KUBECONFIG_DATA" > ~/.kube/config
-        chmod 600 ~/.kube/config
+        mkdir -p /home/ubuntu/.kube
+        echo "$KUBECONFIG_DATA" > /home/ubuntu/.kube/config
+        chmod 600 /home/ubuntu/.kube/config
 
     - name: Setup Helm
       uses: azure/setup-helm@dda3372f752e03dde6b3237bc9431cdc2f7a02a2 # v5.0.0
