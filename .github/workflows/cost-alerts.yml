@@ -1,0 +1,75 @@
+name: Cost Alerts
+
+on:
+  schedule:
+    - cron: "0 9 * * *"  
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment"
+        required: true
+        default: "dev"
+        type: choice
+        options:
+          - dev
+          - prod
+
+env:
+  ENVIRONMENT: ${{ github.event.inputs.environment || 'dev' }}
+
+jobs:
+  check-costs:
+    name: "Check AWS Costs"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Setup Python
+        uses: actions/setup-python@83679a892e2d95755f2dac6acb0bfd1e9ac5d548 # v6.1.0
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install boto3
+
+      - name: Check costs and send alerts
+        id: cost_check
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+          ENVIRONMENT: ${{ env.ENVIRONMENT }}
+          BUDGET_LIMIT: ${{ vars.BUDGET_LIMIT }}
+          ANOMALY_THRESHOLD: ${{ vars.ANOMALY_THRESHOLD }}
+        run: python3 src/scripts/check_costs.py
+
+      - name: Send Telegram summary
+        uses: appleboy/telegram-action@221e6b684967abe813051ee4a37dd61770a83ad3 # v1.0.1
+        if: always()
+        with:
+          to: ${{ secrets.TELEGRAM_CHAT_ID }}
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          format: markdown
+          message: |
+            ${{ steps.cost_check.outputs.status_emoji }} *AWS Cost Report — ${{ env.ENVIRONMENT }}*
+
+            📅 *Period:* `${{ steps.cost_check.outputs.period }}`
+            💰 *Month to date:* `$${{ steps.cost_check.outputs.mtd_cost }} / $${{ vars.BUDGET_LIMIT }}`
+            📊 *Budget used:* `${{ steps.cost_check.outputs.budget_percent }}%`
+            📈 *Yesterday:* `$${{ steps.cost_check.outputs.yesterday_cost }}`
+
+            ${{ steps.cost_check.outputs.alert_message }}
+
+            *Top services:*
+            ${{ steps.cost_check.outputs.top_services }}
+
+            [View in AWS Console](https://console.aws.amazon.com/cost-management/home)
