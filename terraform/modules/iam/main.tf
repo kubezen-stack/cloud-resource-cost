@@ -84,7 +84,6 @@ resource "aws_iam_policy" "ec2_policy" {
           Resource = "*"
         }
       ],
-      }
     )
   })
 
