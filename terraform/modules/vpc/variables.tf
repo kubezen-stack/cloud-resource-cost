@@ -1,10 +1,10 @@
 variable "environment" {
-  description = "The environment for the VPC (e.g., dev, prod)"
+  description = "The environment for the VPC (e.g., dev, prod, stage)"
   type        = string
 
   validation {
-    condition     = contains(["dev", "prod", "staging"], var.environment)
-    error_message = "Environment must be one of 'dev', 'prod', or 'staging'."
+    condition     = contains(["dev", "prod", "stage"], var.environment)
+    error_message = "Environment must be one of 'dev', 'prod', or 'stage'."
   }
 }
 
