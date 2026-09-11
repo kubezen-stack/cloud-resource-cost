@@ -94,7 +94,7 @@ resource "aws_instance" "ec2_instance" {
 }
 
 resource "aws_eip" "ec2_eip" {
-  count    = var.environment == "prod" || var.environment == "stage" ? var.instance_count : 0
+  count    = var.environment == "prod" ? var.instance_count : 0
   instance = aws_instance.ec2_instance[count.index].id
   domain   = "vpc"
   tags = merge(

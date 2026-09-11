@@ -234,11 +234,6 @@ jobs:
             --namespace cost-optimizer \
             --dry-run=client -o yaml | kubectl apply -f -
 
-      # dev: DB lives in an in-cluster postgresql pod (bitnami subchart),
-      #      password comes from a GitHub secret we choose ourselves.
-      # stage/prod: DB is RDS, provisioned by Terraform, which already
-      #      generated a random password and stored it (with host/port/name)
-      #      in Secrets Manager. We just read it — never set it here.
       - name: Resolve database credentials
         id: db
         run: |
@@ -433,9 +428,7 @@ jobs:
     name: "ArgoCD Deploy (${{ github.event.inputs.environment || 'dev' }})"
     runs-on: "self-hosted"
     environment: "${{ github.event.inputs.environment || 'dev' }}"
-    # ArgoCD only makes sense once there's GitOps to do (dev deploys straight
-    # via helm-deploy above). Skip it entirely for dev.
-    if: ${{ (github.event.inputs.environment || 'dev') != 'dev' }}
+    if: false
     needs: helm-deploy-monitoring
     env:
       KUBECONFIG: /home/ubuntu/.kube/config
