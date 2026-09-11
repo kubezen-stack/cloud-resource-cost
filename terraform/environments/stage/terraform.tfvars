@@ -1,5 +1,5 @@
 aws_region          = "us-east-1"
-vpc_cidr            = "10.0.0.0/16"
+vpc_cidr            = "10.1.0.0/16"
 availability_zones  = ["us-east-1a", "us-east-1b"]
 nat_gateway_enabled = false
 nat_gateway_single  = false
@@ -15,8 +15,8 @@ kubernetes_version = "1.28"
 ssh_access_cidr    = ["0.0.0.0/0"]
 create_alb         = false
 
-enable_rds              = false
-db_instance_class       = "db.t3.micro"
+enable_rds              = true
+db_instance_class       = "db.t3.small"
 allocated_storage       = 20
 multi_az                = false
-backup_retention_period = 3
+backup_retention_period = 7

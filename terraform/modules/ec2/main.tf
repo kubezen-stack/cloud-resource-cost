@@ -42,7 +42,7 @@ resource "aws_instance" "ec2_instance" {
   instance_type               = var.instance_type
   subnet_id                   = var.subnet_ids[count.index % length(var.subnet_ids)]
   security_groups             = var.security_group_ids
-  associate_public_ip_address = var.environment == "prod" || var.environment == "stage" ? false : true
+  associate_public_ip_address = var.environment == "prod" ? false : true
   key_name                    = var.key_name
   iam_instance_profile        = var.iam_instance_profile
 
@@ -94,7 +94,7 @@ resource "aws_instance" "ec2_instance" {
 }
 
 resource "aws_eip" "ec2_eip" {
-  count    = var.environment == "prod" ? var.instance_count : 0
+  count    = var.environment == "prod" || var.environment == "stage" ? var.instance_count : 0
   instance = aws_instance.ec2_instance[count.index].id
   domain   = "vpc"
   tags = merge(

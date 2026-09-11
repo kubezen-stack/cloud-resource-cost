@@ -1,0 +1,79 @@
+output "vpc_id" {
+  description = "The ID of the VPC"
+  value       = module.vpc.vpc_id
+}
+
+output "vpc_cidr" {
+  description = "The CIDR block of the VPC"
+  value       = module.vpc.vpc_cidr
+}
+
+output "public_subnet_ids" {
+  description = "List of public subnet IDs"
+  value       = module.vpc.public_subnet_ids
+}
+
+output "private_subnet_ids" {
+  description = "List of private subnet IDs"
+  value       = module.vpc.private_subnet_ids
+}
+
+output "nat_gateway_ids" {
+  description = "List of NAT Gateway IDs"
+  value       = module.vpc.nat_gateway_ids
+}
+
+output "ec2_instance_ids" {
+  description = "The IDs of the launched EC2 instances"
+  value       = module.ec2.ec2_instance_ids
+}
+
+output "ec2_instance_public_ips" {
+  description = "The public IPs of the launched EC2 instances"
+  value       = module.ec2.ec2_instance_public_ips
+}
+
+output "ec2_instance_private_ips" {
+  description = "The private IPs of the launched EC2 instances"
+  value       = module.ec2.ec2_instance_private_ips
+}
+
+output "ssh_connection_information" {
+  description = "SSH connection information for all EC2 instances"
+  value       = module.ec2.ssh_connection_information
+}
+
+output "ami_id_used" {
+  description = "The AMI ID used for the EC2 instances"
+  value       = module.ec2.ami_id_used
+}
+
+output "ecr_repository_url" {
+  description = "The URL of the ECR repository"
+  value       = module.ecr.repository_url
+}
+
+output "ecr_repository_name" {
+  description = "The name of the ECR repository"
+  value       = module.ecr.repository_name
+}
+
+output "ecr_push_commands" {
+  description = "Commands to build and push Docker image to ECR"
+  value       = module.ecr.summary_ecr.push_commands
+}
+
+output "ssh_secret_name" {
+  description = "AWS Secrets Manager secret name containing the SSH private key"
+  value       = length(aws_secretsmanager_secret.ssh_private_key) > 0 ? aws_secretsmanager_secret.ssh_private_key[0].name : null
+}
+
+output "key_name" {
+  description = "The name of the EC2 key pair"
+  value       = aws_key_pair.deployer_key.key_name
+}
+
+output "ec2_eips" {
+  description = "Elastic IPs of EC2 instances"
+  value       = module.ec2.ec2_eips
+}

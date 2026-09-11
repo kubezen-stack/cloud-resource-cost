@@ -57,3 +57,4 @@ collections/
 *.pem
 join-command.sh
 MANIFEST
+.DS_Store
