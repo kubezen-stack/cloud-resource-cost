@@ -61,7 +61,7 @@ database:
   host: "REPLACED_BY_CI"
   port: 5432
   name: cost_optimizer_stage
-  user: dbadmin
+  user: app_user
   password: ""
 
 postgresql:
