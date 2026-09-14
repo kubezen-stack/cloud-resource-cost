@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Annotated, List
 from fastapi import APIRouter, Depends, HTTPException, status
 import uuid as uuid_pkg
@@ -60,7 +60,7 @@ async def connect_aws_account(account_data: AWSCreateAccount,
     external_id = current_user.external_id
 
     is_valid, error = validate_aws_role(account_data.role_arn, external_id)
-    
+
     if not is_valid:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -84,7 +84,7 @@ async def connect_aws_account(account_data: AWSCreateAccount,
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
-    
+
     return new_account
 
 @router.get('/', response_model=List[AWSAccountResponse])
@@ -97,13 +97,13 @@ async def get_aws_accounts(current_user: Annotated[User, Depends(get_current_use
 
 @router.get('/{aws_account_id}', response_model=AWSAccountResponse)
 async def get_aws_account(
-    aws_account_id: str, 
+    aws_account_id: uuid_pkg.UUID,
     current_user: Annotated[User, Depends(get_current_user)], 
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     result = await db.execute(
         select(AWSaccount).where(
-            AWSaccount.aws_account_id == aws_account_id,
+            AWSaccount.id == aws_account_id,
             AWSaccount.user_id == current_user.id
         )
     )
