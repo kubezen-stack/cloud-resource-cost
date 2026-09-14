@@ -35,7 +35,7 @@
   ansible.builtin.get_url:
     url: https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
     dest: /tmp/get_helm.sh
-    mode: '0700'
+    mode: "0700"
   when: helm_exists.rc != 0
   tags: install
 
@@ -52,8 +52,10 @@
 
 - name: Get ECR registry URL
   ansible.builtin.shell: |
+    set -o pipefail
     aws ecr describe-repositories \
       --repository-names "cost-optimizer-{{ target_env }}" \
+      --region "{{ aws_region | default('us-east-1') }}" \
       --query "repositories[0].repositoryUri" \
       --output text | cut -d'/' -f1
   register: ecr_registry_url_result
@@ -105,9 +107,18 @@
   loop:
     - { name: "bitnami", url: "https://charts.bitnami.com/bitnami" }
     - { name: "jetstack", url: "https://charts.jetstack.io" }
-    - { name: "ingress-nginx", url: "https://kubernetes.github.io/ingress-nginx" }
-    - { name: "prometheus-community", url: "https://prometheus-community.github.io/helm-charts" }
-    - { name: "victoriametrics", url: "https://victoriametrics.github.io/helm-charts" }
+    - {
+        name: "ingress-nginx",
+        url: "https://kubernetes.github.io/ingress-nginx",
+      }
+    - {
+        name: "prometheus-community",
+        url: "https://prometheus-community.github.io/helm-charts",
+      }
+    - {
+        name: "victoriametrics",
+        url: "https://victoriametrics.github.io/helm-charts",
+      }
     - { name: "grafana", url: "https://grafana.github.io/helm-charts" }
   tags: repos
 

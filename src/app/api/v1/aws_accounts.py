@@ -13,6 +13,20 @@ from app.services.aws_validation_service import validate_aws_role
 
 router = APIRouter()
 
+@router.get("/external-id")
+async def get_external_id(current_user: Annotated[User, Depends(get_current_user)],
+                          db: Annotated[AsyncSession, Depends(get_db)]):
+    if not current_user.external_id:
+        current_user.external_id = f"cost-opt-{uuid_pkg.uuid4()}"
+        db.add(current_user)
+        try:
+            await db.commit()
+            await db.refresh(current_user)
+        except Exception as e:
+            await db.rollback()
+            raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    return {"external_id": current_user.external_id}
+
 @router.post("/", response_model=AWSAccountResponse, status_code=status.HTTP_201_CREATED, responses={500: {"description": "Database error"}})
 async def connect_aws_account(account_data: AWSCreateAccount,
                               current_user: Annotated[User, Depends(get_current_user)],
@@ -38,9 +52,15 @@ async def connect_aws_account(account_data: AWSCreateAccount,
             detail=f"AWS account {account_data.aws_account_id} is already connected"
         )
 
-    external_id = f"cost-opt-{str(uuid_pkg.uuid4())[:16]}"
+    if not current_user.external_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Call GET /aws_accounts/external-id first"
+        )
+    external_id = current_user.external_id
 
     is_valid, error = validate_aws_role(account_data.role_arn, external_id)
+    
     if not is_valid:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

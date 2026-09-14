@@ -39,13 +39,18 @@ def auth_token(client):
 def auth_headers(auth_token):
     return {"Authorization": f"Bearer {auth_token}"}
 
+@pytest.fixture(scope="module")
+def external_id(client, auth_headers):
+    r = client.get(f"{API}/aws_accounts/external-id", headers=auth_headers)
+    assert r.status_code == 200, f"Get external_id failed: {r.text}"
+    return r.json()["external_id"]
 
 @pytest.fixture(scope="module")
-def aws_account_id(client, auth_headers):
+def aws_account_id(client, auth_headers, external_id):
     r = client.post(f"{API}/aws_accounts/", headers=auth_headers, json={
         "aws_account_name": "Smoke Test Account",
-        "aws_account_id": "123456789012",
-        "role_arn": f"arn:aws:iam::123456789012:role/SmokeRole-{_uid}",
+        "aws_account_id": "576771098395",
+        "role_arn": "arn:aws:iam::576771098395:role/SmokeTestRole",
     })
     assert r.status_code == 201, f"Create AWS account failed: {r.text}"
     return r.json()["id"]
@@ -291,15 +296,15 @@ def test_breakdown_endpoint_exists(client, auth_headers, aws_account_id):
 
 
 def test_costs_unknown_account_returns_404(client, auth_headers):
-    r = client.get(f"{API}/costs/{uuid.uuid4()}/costs", headers=auth_headers)
+    r = client.get(f"{API}/costs/999999999999/costs", headers=auth_headers)
     assert r.status_code == 404
 
 
 def test_forecast_unknown_account_returns_404(client, auth_headers):
-    r = client.get(f"{API}/costs/{uuid.uuid4()}/forecast", headers=auth_headers)
+    r = client.get(f"{API}/costs/999999999999/forecast", headers=auth_headers)
     assert r.status_code == 404
 
 
 def test_breakdown_unknown_account_returns_404(client, auth_headers):
-    r = client.get(f"{API}/costs/{uuid.uuid4()}/breakdown", headers=auth_headers)
+    r = client.get(f"{API}/costs/999999999999/breakdown", headers=auth_headers)
     assert r.status_code == 404
