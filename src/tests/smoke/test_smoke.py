@@ -53,7 +53,7 @@ def aws_account_id(client, auth_headers, external_id):
         "role_arn": "arn:aws:iam::576771098395:role/SmokeTestRole",
     })
     assert r.status_code == 201, f"Create AWS account failed: {r.text}"
-    return r.json()["aws_account_id"]
+    return r.json()["id"]
 
 
 # ---------------------------------------------------------------------------
@@ -241,15 +241,14 @@ def test_get_accounts_returns_list(client, auth_headers):
 
 def test_created_account_in_list(client, auth_headers, aws_account_id):
     r = client.get(f"{API}/aws_accounts/", headers=auth_headers)
-    ids = [acc["aws_account_id"] for acc in r.json()] + [acc["id"] for acc in r.json()]
+    ids = [acc["id"] for acc in r.json()]
     assert aws_account_id in ids
 
 
 def test_get_account_by_id(client, auth_headers, aws_account_id):
     r = client.get(f"{API}/aws_accounts/{aws_account_id}", headers=auth_headers)
     assert r.status_code == 200
-    data = r.json()
-    assert aws_account_id in (data.get("id"), data.get("aws_account_id"))
+    assert r.json()["id"] == aws_account_id
 
 
 def test_account_response_shape(client, auth_headers, aws_account_id):
