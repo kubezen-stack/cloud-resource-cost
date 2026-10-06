@@ -1,8 +1,21 @@
 argo-cd:
   server:
     service:
-      type: NodePort
-      nodePortHttp: 30808
+      type: ClusterIP
+
+    ingress:
+      enabled: true
+      ingressClassName: nginx
+      annotations:
+        cert-manager.io/cluster-issuer: letsencrypt-staging
+        nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+      hostname: "HOST_PLACEHOLDER"
+      tls: true
+      extraTls:
+        - secretName: argocd-stage-tls
+          hosts:
+            - "HOST_PLACEHOLDER"
+
   configs:
     params:
       server.insecure: true

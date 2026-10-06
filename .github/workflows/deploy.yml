@@ -183,16 +183,21 @@ jobs:
       - name: Create Terraform plugin cache dir
         run: mkdir -p ${{ github.workspace }}/.terraform_cache
 
-      - name: Get ECR URL and public IP from terraform
+      - name: Get ECR URL and app hostname from terraform
         id: tf
         working-directory: terraform/environments/${{ env.ENVIRONMENT }}
         run: |
           terraform init -input=false -reconfigure
           ECR_URL=$(terraform output -raw ecr_repository_url 2>/dev/null | tail -n1)
           echo "ecr_url=${ECR_URL}" >> $GITHUB_OUTPUT
-          # worker node public IP, used for the app hostname (see values-<env>.yaml ingress notes)
-          PUBLIC_IP=$(terraform output -json ec2_instance_public_ips 2>/dev/null | jq -r '.[1] // .[0] // empty')
-          echo "public_ip=${PUBLIC_IP}" >> $GITHUB_OUTPUT
+
+          IP=$(terraform output -json ec2_eips 2>/dev/null | jq -r '.[1] // .[0] // empty')
+          if [ -z "$IP" ]; then
+            IP=$(terraform output -json ec2_instance_public_ips 2>/dev/null | jq -r '.[1] // .[0] // empty')
+          fi
+          echo "app_ip=${IP}" >> $GITHUB_OUTPUT
+          echo "app_host=${{ env.ENVIRONMENT }}.${IP}.sslip.io" >> $GITHUB_OUTPUT
+          echo "argocd_host=argocd-${{ env.ENVIRONMENT }}.${IP}.sslip.io" >> $GITHUB_OUTPUT
         env:
           TF_PLUGIN_CACHE_DIR: ${{ github.workspace }}/.terraform_cache
 
@@ -222,6 +227,29 @@ jobs:
       - name: Helm build dependencies
         run: |
           helm dependency build ./helm/cost-optimizer --skip-refresh
+
+      - name: Install ingress-nginx and cert-manager
+        if: env.ENVIRONMENT != 'dev'
+        run: |
+          helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+          helm repo add jetstack https://charts.jetstack.io
+          helm repo update ingress-nginx jetstack
+
+          helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
+            -f ./helm/ingress-nginx/values.yaml \
+            --namespace ingress-nginx \
+            --create-namespace \
+            --timeout 300s \
+            --wait
+
+          helm upgrade --install cert-manager jetstack/cert-manager \
+            -f ./helm/cert-manager/values.yaml \
+            --namespace cert-manager \
+            --create-namespace \
+            --timeout 300s \
+            --wait
+
+          kubectl apply -f ./helm/cert-manager/cluster-issuer-staging.yaml
 
       - name: Create ECR Secret in K8s
         run: |
@@ -262,6 +290,7 @@ jobs:
         env:
           APP_SECRET: ${{ secrets.APP_SECRET_KEY }}
           DB_PASS: ${{ steps.db.outputs.db_password }}
+          APP_HOST: ${{ steps.tf.outputs.app_host }}
         run: |
           helm upgrade --install cost-optimizer ./helm/cost-optimizer \
           -f ./helm/cost-optimizer/values-${{ env.ENVIRONMENT }}.yaml \
@@ -273,6 +302,8 @@ jobs:
           --set database.port=${{ steps.db.outputs.db_port }} \
           --set database.password=$DB_PASS \
           --set postgresql.auth.password=$DB_PASS \
+          --set ingress.hosts[0].host=$APP_HOST \
+          --set ingress.tls[0].hosts[0]=$APP_HOST \
           --namespace cost-optimizer \
           --create-namespace \
           --timeout 600s \

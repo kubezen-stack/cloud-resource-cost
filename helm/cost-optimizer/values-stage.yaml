@@ -12,13 +12,24 @@ imagePullSecrets:
   - name: ecr-secret
 
 service:
-  type: NodePort
+  type: ClusterIP
   port: 80
   targetPort: 8000
-  nodePort: 30081
 
 ingress:
-  enabled: false
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-staging
+  hosts:
+    - host: "HOST_PLACEHOLDER"
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: cost-optimizer-stage-tls
+      hosts:
+        - "HOST_PLACEHOLDER"
 
 resources:
   main:
