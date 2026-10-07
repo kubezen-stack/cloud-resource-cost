@@ -251,6 +251,22 @@ jobs:
 
           kubectl apply -f ./helm/cert-manager/cluster-issuer-staging.yaml
 
+      - name: Install External Secrets Operator
+        if: env.ENVIRONMENT == 'stage'
+        run: |
+          helm repo add external-secrets https://charts.external-secrets.io
+          helm repo update external-secrets
+
+          helm upgrade --install external-secrets external-secrets/external-secrets \
+            -f ./helm/external-secrets/values.yaml \
+            --namespace external-secrets \
+            --create-namespace \
+            --timeout 300s \
+            --wait
+
+          sed "s/REGION_PLACEHOLDER/${{ secrets.AWS_REGION }}/" \
+            ./helm/external-secrets/cluster-secret-store.yaml | kubectl apply -f -
+
       - name: Create ECR Secret in K8s
         run: |
           ECR_PASSWORD=$(aws ecr get-login-password --region ${{ secrets.AWS_REGION }})
@@ -261,6 +277,13 @@ jobs:
             --docker-password="$ECR_PASSWORD" \
             --namespace cost-optimizer \
             --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Apply External Secret for DB credentials
+        if: env.ENVIRONMENT == 'stage'
+        run: |
+          kubectl apply -f ./helm/external-secrets/external-secret-cost-optimizer-stage.yaml
+          kubectl wait --for=condition=Ready externalsecret/cost-optimizer-db-secret \
+            --namespace cost-optimizer --timeout=60s
 
       - name: Resolve database credentials
         id: db

@@ -75,6 +75,10 @@ database:
   user: app_user
   password: ""
 
+externalSecrets:
+  enabled: true
+  dbSecretName: cost-optimizer-db-secret
+
 postgresql:
   enabled: false
 

@@ -217,6 +217,33 @@ resource "aws_iam_policy" "vault_hashicorp_policy" {
   )
 }
 
+resource "aws_iam_policy" "secrets_manager_policy" {
+  count       = length(var.secrets_manager_arns) > 0 ? 1 : 0
+  name        = "${local.hostname-tag}-secrets-manager-policy"
+  description = "Policy for EC2 instances (read by pods via node IAM role, e.g. External Secrets Operator) to read specific Secrets Manager secrets"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue",
+          "secretsmanager:DescribeSecret"
+        ]
+        Resource = var.secrets_manager_arns
+      }
+    ]
+  })
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "${local.hostname-tag}-secrets-manager-policy-${var.environment}"
+    }
+  )
+}
+
 resource "aws_iam_policy" "ecr_policy" {
   count       = var.enable_ecr ? 1 : 0
   name        = "${local.hostname-tag}-ecr-policy"
@@ -276,6 +303,12 @@ resource "aws_iam_role_policy_attachment" "vault_hashicorp_policy_attachment" {
   count      = var.enable_vault_auth ? 1 : 0
   role       = aws_iam_role.ec2_role.name
   policy_arn = aws_iam_policy.vault_hashicorp_policy[0].arn
+}
+
+resource "aws_iam_role_policy_attachment" "secrets_manager_policy_attachment" {
+  count      = length(var.secrets_manager_arns) > 0 ? 1 : 0
+  role       = aws_iam_role.ec2_role.name
+  policy_arn = aws_iam_policy.secrets_manager_policy[0].arn
 }
 
 resource "aws_iam_role_policy_attachment" "ecr_policy_attachment" {

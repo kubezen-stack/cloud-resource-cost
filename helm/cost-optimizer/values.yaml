@@ -69,6 +69,10 @@ database:
   passwordSecretName: cost-optimizer-secrets
   passwordSecretKey: database-password
 
+externalSecrets:
+  enabled: false
+  dbSecretName: cost-optimizer-db-secret
+
 postgresql:
   enabled: true
   auth:

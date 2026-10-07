@@ -130,6 +130,7 @@ module "iam" {
   enable_vault_auth    = var.enable_vault_auth
   enable_ecr           = true
   ecr_repository_arns  = []
+  secrets_manager_arns = var.enable_rds ? [module.rds[0].master_secret_arn] : []
 
   tags = local.common_tags
 }

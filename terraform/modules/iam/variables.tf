@@ -50,6 +50,12 @@ variable "customer_role_arns" {
   default     = []
 }
 
+variable "secrets_manager_arns" {
+  description = "List of Secrets Manager secret ARNs that EC2 instances (and pods using the node IAM role, e.g. External Secrets Operator) may read. If empty, no secretsmanager:GetSecretValue permission is granted."
+  type        = list(string)
+  default     = []
+}
+
 variable "tags" {
   description = "A map of tags to assign to the EC2 instances"
   type        = map(string)
