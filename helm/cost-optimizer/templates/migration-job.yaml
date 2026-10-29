@@ -48,7 +48,11 @@ spec:
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
+                  {{- if .Values.externalSecrets.enabled }}
+                  name: {{ .Values.externalSecrets.dbSecretName }}
+                  {{- else }}
                   name: {{ include "cost-optimizer.fullname" . }}-secrets
+                  {{- end }}
                   key: database-password
             - name: SECRET_KEY
               valueFrom:
