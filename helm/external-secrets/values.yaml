@@ -1,5 +1,9 @@
 installCRDs: true
 
+crds:
+  createPushSecret: false
+  createClusterPushSecret: false
+
 resources:
   requests:
     cpu: 25m
