@@ -4,6 +4,9 @@ crds:
   createPushSecret: false
   createClusterPushSecret: false
 
+processPushSecret: false
+processClusterPushSecret: false
+
 resources:
   requests:
     cpu: 25m
