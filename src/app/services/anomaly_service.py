@@ -3,7 +3,6 @@ import logging
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import Dict, List, Optional
-from sklearn.ensemble import IsolationForest
 import numpy as np
 
 logger = logging.getLogger(__name__)
@@ -108,6 +107,8 @@ def detect_series_anomalies(service: str, series: Dict[date, float]) -> List[Ano
         residual / noise,
     ])
 
+    from sklearn.ensemble import IsolationForest
+    
     forest = IsolationForest(
         n_estimators=200,
         contamination=CONTAMINATION,
