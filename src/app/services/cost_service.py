@@ -2,6 +2,7 @@ import datetime
 from typing import Dict, List, Optional
 import boto3
 from botocore.config import Config
+from botocore.exceptions import ClientError
 import logging
 import threading
 
@@ -77,7 +78,8 @@ class AWSCostService:
         end_date: str, 
         granularity: str = "DAILY", 
         metrics: Optional[List[str]] = None, 
-        group_by: Optional[List[Dict]] = None
+        group_by: Optional[List[Dict]] = None,
+        _retried: bool = False
     ) -> List[Dict]:
         """Get cost and usage data from AWS Cost Explorer"""
         client = self._get_cost_explorer_client()
@@ -99,12 +101,13 @@ class AWSCostService:
                 Metrics=metrics
             )
             return response["ResultsByTime"]
-        except self._client.exceptions as e:
-            if "ExpiredToken" in str(e):
+        except ClientError as e:
+            code = e.response.get("Error", {}).get("Code", "")
+            if code in ("ExpiredToken", "ExpiredTokenException") and not _retried:
                 self._client = None
                 self._credentials = None
                 self._expiry_credentials = None
-                return self.get_cost_and_usage(start_date, end_date, granularity, metrics, group_by)
+                return self.get_cost_and_usage(start_date, end_date, granularity, metrics, group_by, _retried=True)
             logger.exception(f"Failed to get cost data: {str(e)}")
             raise ValueError(f"Failed to fetch AWS costs: {str(e)}")
         except Exception as e:

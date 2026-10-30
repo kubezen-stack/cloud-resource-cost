@@ -39,19 +39,19 @@ MOCK_FORECAST = [
 async def test_get_costs_success(client, auth_headers, aws_account):
     with patch("app.services.cost_service.AWSCostService.get_cost_and_usage", return_value=MOCK_COSTS):
         response = await client.get(
-            f"/api/v1/costs/{aws_account.id}/costs",
+            f"/api/v1/costs/{aws_account.aws_account_id}/costs",
             headers=auth_headers
         )
     assert response.status_code == 200
     data = response.json()
-    assert data["account_id"] == str(aws_account.id)
+    assert data["aws_account_id"] == aws_account.aws_account_id
     assert "results" in data
 
 
 @pytest.mark.asyncio
 async def test_get_costs_account_not_found(client, auth_headers):
     response = await client.get(
-        f"/api/v1/costs/{uuid.uuid4()}/costs",
+        "/api/v1/costs/999999999999/costs",
         headers=auth_headers
     )
     assert response.status_code == 404
@@ -59,7 +59,7 @@ async def test_get_costs_account_not_found(client, auth_headers):
 
 @pytest.mark.asyncio
 async def test_get_costs_unauthorized(client, aws_account):
-    response = await client.get(f"/api/v1/costs/{aws_account.id}/costs")
+    response = await client.get(f"/api/v1/costs/{aws_account.aws_account_id}/costs")
     assert response.status_code == 401
 
 
@@ -67,19 +67,19 @@ async def test_get_costs_unauthorized(client, aws_account):
 async def test_get_forecast_success(client, auth_headers, aws_account):
     with patch("app.services.cost_service.AWSCostService.get_cost_forecast", return_value=MOCK_FORECAST):
         response = await client.get(
-            f"/api/v1/costs/{aws_account.id}/forecast",
+            f"/api/v1/costs/{aws_account.aws_account_id}/forecast",
             headers=auth_headers
         )
     assert response.status_code == 200
     data = response.json()
-    assert data["account_id"] == str(aws_account.id)
+    assert data["aws_account_id"] == aws_account.aws_account_id
     assert "forecast" in data
 
 
 @pytest.mark.asyncio
 async def test_get_forecast_account_not_found(client, auth_headers):
     response = await client.get(
-        f"/api/v1/costs/{uuid.uuid4()}/forecast",
+        "/api/v1/costs/999999999999/forecast",
         headers=auth_headers
     )
     assert response.status_code == 404
@@ -89,7 +89,7 @@ async def test_get_forecast_account_not_found(client, auth_headers):
 async def test_get_breakdown_success(client, auth_headers, aws_account):
     with patch("app.services.cost_service.AWSCostService.get_cost_and_usage", return_value=MOCK_COSTS):
         response = await client.get(
-            f"/api/v1/costs/{aws_account.id}/breakdown",
+            f"/api/v1/costs/{aws_account.aws_account_id}/breakdown",
             headers=auth_headers
         )
     assert response.status_code == 200
@@ -101,7 +101,7 @@ async def test_get_breakdown_success(client, auth_headers, aws_account):
 @pytest.mark.asyncio
 async def test_get_breakdown_account_not_found(client, auth_headers):
     response = await client.get(
-        f"/api/v1/costs/{uuid.uuid4()}/breakdown",
+        "/api/v1/costs/999999999999/breakdown",
         headers=auth_headers
     )
     assert response.status_code == 404

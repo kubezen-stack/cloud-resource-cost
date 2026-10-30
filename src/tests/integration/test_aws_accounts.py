@@ -1,5 +1,7 @@
 import pytest
+import pytest_asyncio
 import uuid
+from unittest.mock import patch
 from app.models.aws_account import AWSaccount
 
 
@@ -10,15 +12,44 @@ VALID_ACCOUNT = {
 }
 
 
+@pytest_asyncio.fixture
+async def external_id(client, auth_headers):
+    response = await client.get("/api/v1/aws_accounts/external-id", headers=auth_headers)
+    assert response.status_code == 200
+    return response.json()["external_id"]
+
+
+@pytest.fixture
+def role_is_valid():
+    with patch("app.api.v1.aws_accounts.validate_aws_role", return_value=(True, None)) as mocked:
+        yield mocked
+
+
 @pytest.mark.asyncio
-async def test_create_aws_account(client, auth_headers):
+async def test_create_aws_account(client, auth_headers, external_id, role_is_valid):
     response = await client.post("/api/v1/aws_accounts/", headers=auth_headers, json=VALID_ACCOUNT)
     assert response.status_code == 201
     data = response.json()
     assert data["aws_account_name"] == "My AWS Account"
     assert data["aws_account_id"] == "123456789012"
-    assert "external_id" in data
+    assert data["external_id"] == external_id
     assert "id" in data
+    role_is_valid.assert_called_once_with(VALID_ACCOUNT["role_arn"], external_id)
+
+
+@pytest.mark.asyncio
+async def test_create_aws_account_requires_external_id(client, auth_headers, role_is_valid):
+    response = await client.post("/api/v1/aws_accounts/", headers=auth_headers, json=VALID_ACCOUNT)
+    assert response.status_code == 400
+    assert "external-id" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_create_aws_account_role_cannot_be_assumed(client, auth_headers, external_id):
+    with patch("app.api.v1.aws_accounts.validate_aws_role", return_value=(False, "AccessDenied")):
+        response = await client.post("/api/v1/aws_accounts/", headers=auth_headers, json=VALID_ACCOUNT)
+    assert response.status_code == 400
+    assert "Cannot assume role" in response.json()["detail"]
 
 
 @pytest.mark.asyncio
@@ -28,8 +59,9 @@ async def test_create_aws_account_unauthorized(client):
 
 
 @pytest.mark.asyncio
-async def test_create_duplicate_role_arn(client, auth_headers):
-    await client.post("/api/v1/aws_accounts/", headers=auth_headers, json=VALID_ACCOUNT)
+async def test_create_duplicate_role_arn(client, auth_headers, external_id, role_is_valid):
+    first = await client.post("/api/v1/aws_accounts/", headers=auth_headers, json=VALID_ACCOUNT)
+    assert first.status_code == 201
     response = await client.post("/api/v1/aws_accounts/", headers=auth_headers, json=VALID_ACCOUNT)
     assert response.status_code == 400
 
