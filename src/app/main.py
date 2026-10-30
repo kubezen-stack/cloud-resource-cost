@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.v1 import auth, aws_accounts, costs, health, users
+from app.api.v1 import anomalies, auth, aws_accounts, costs, health, users
 from app.core.config import settings
 from prometheus_fastapi_instrumentator import Instrumentator
 
@@ -22,6 +22,7 @@ app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["Aut
 app.include_router(users.router, prefix=f"{settings.API_V1_STR}/users", tags=["Users"])
 app.include_router(aws_accounts.router, prefix=f"{settings.API_V1_STR}/aws_accounts", tags=["AWS Accounts"])
 app.include_router(costs.router, prefix=f"{settings.API_V1_STR}/costs", tags=["Costs"])
+app.include_router(anomalies.router, prefix=f"{settings.API_V1_STR}/costs", tags=["Anomalies"])
 app.include_router(health.router, prefix=f"{settings.API_V1_STR}/health", tags=["Health"])
 
 
