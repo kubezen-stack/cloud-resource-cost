@@ -75,6 +75,18 @@ database:
   user: app_user
   password: ""
 
+anomalyDetection:
+  enabled: true
+  schedule: "0 3 * * *"
+  days: 90
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 768Mi
+
 externalSecrets:
   enabled: true
   dbSecretName: cost-optimizer-db-secret

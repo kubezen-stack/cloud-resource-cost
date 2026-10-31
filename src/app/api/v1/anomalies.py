@@ -3,9 +3,8 @@ from datetime import datetime, timedelta
 from typing import Annotated, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
-from sqlalchemy import delete, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from starlette.concurrency import run_in_threadpool
 
 from app.core.database import get_db
 from app.core.deps import get_current_user
@@ -13,8 +12,8 @@ from app.models.aws_account import AWSaccount
 from app.models.cost_anomaly import CostAnomaly
 from app.models.user import User
 from app.schemas.anomalies import AnomalyDetectResponse, AnomalyItem, AnomalyListResponse
-from app.services.anomaly_service import Anomaly, detect_anomalies
-from app.services.cost_service import AWSCostService
+from app.services.anomaly_runner import analyze_account, store_anomalies
+from app.services.anomaly_service import Anomaly
 
 logger = logging.getLogger(__name__)
 
@@ -33,15 +32,6 @@ async def _get_account(db: AsyncSession, user: User, aws_account_id: str) -> AWS
     if not account:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="AWS account not found")
     return account
-
-def _fetch_daily_costs_by_service(account: AWSaccount, start: str, end: str) -> list:
-    cost_service = AWSCostService(role_arn=account.role_arn, external_id=account.external_id)
-    return cost_service.get_cost_and_usage(
-        start_date=start,
-        end_date=end,
-        granularity="DAILY",
-        group_by=[{"Type": "DIMENSION", "Key": "SERVICE"}],
-    )
 
 def _item_from_detected(anomaly: Anomaly) -> AnomalyItem:
     return AnomalyItem(
@@ -73,13 +63,8 @@ async def detect_cost_anomalies(
 ):
     account = await _get_account(db, current_user, aws_account_id)
 
-    end_day = datetime.utcnow().date()
-    start_day = end_day - timedelta(days=days)
-    start, end = start_day.isoformat(), end_day.isoformat()
-
     try:
-        results = await run_in_threadpool(_fetch_daily_costs_by_service, account, start, end)
-        anomalies = await run_in_threadpool(detect_anomalies, results)
+        analysis = await analyze_account(account, days)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception:
@@ -89,51 +74,24 @@ async def detect_cost_anomalies(
             detail="Failed to detect anomalies",
         )
 
-    services_analyzed = len({
-        key
-        for period in results
-        for group in period.get("Groups", [])
-        for key in group.get("Keys", [])[:1]
-    })
-
     try:
-        await db.execute(
-            delete(CostAnomaly).where(
-                CostAnomaly.aws_account_id == account.id,
-                CostAnomaly.anomaly_date >= start_day,
-                CostAnomaly.anomaly_date < end_day,
-            )
-        )
-        now = datetime.utcnow()
-        for a in anomalies:
-            db.add(CostAnomaly(
-                aws_account_id=account.id,
-                service_name=a.service,
-                anomaly_date=a.day,
-                actual_cost=a.actual_cost,
-                expected_cost=a.expected_cost,
-                deviation_pct=a.deviation_pct,
-                anomaly_score=a.anomaly_score,
-                detected_at=now,
-            ))
-        await db.commit()
+        now = await store_anomalies(db, account, analysis)
     except Exception:
-        await db.rollback()
         logger.exception("Failed to store anomalies for account %s", aws_account_id)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to store anomalies",
         )
 
-    items: List[AnomalyItem] = [_item_from_detected(a) for a in anomalies]
+    items: List[AnomalyItem] = [_item_from_detected(a) for a in analysis.anomalies]
     for item in items:
         item.detected_at = now
 
     return AnomalyDetectResponse(
         aws_account_id=aws_account_id,
-        start_date=start,
-        end_date=end,
-        services_analyzed=services_analyzed,
+        start_date=analysis.start_day.isoformat(),
+        end_date=analysis.end_day.isoformat(),
+        services_analyzed=analysis.services_analyzed,
         anomalies=items,
     )
 

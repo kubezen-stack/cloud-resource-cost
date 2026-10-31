@@ -1,0 +1,70 @@
+{{- if .Values.anomalyDetection.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "cost-optimizer.fullname" . }}-anomaly-detection
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "cost-optimizer.labels" . | nindent 4 }}
+    component: anomaly-detection
+spec:
+  schedule: {{ .Values.anomalyDetection.schedule | quote }}
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 3600
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      ttlSecondsAfterFinished: 86400
+      template:
+        metadata:
+          labels:
+            {{- include "cost-optimizer.selectorLabels" . | nindent 12 }}
+            component: anomaly-detection
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false
+          {{- with .Values.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          containers:
+            - name: anomaly-detection
+              image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              command: ["python", "-m", "app.jobs.detect_anomalies", "--days", {{ .Values.anomalyDetection.days | quote }}]
+              resources:
+                requests:
+                  cpu: {{ .Values.anomalyDetection.resources.requests.cpu }}
+                  memory: {{ .Values.anomalyDetection.resources.requests.memory }}
+                limits:
+                  cpu: {{ .Values.anomalyDetection.resources.limits.cpu }}
+                  memory: {{ .Values.anomalyDetection.resources.limits.memory }}
+              envFrom:
+                - configMapRef:
+                    name: {{ include "cost-optimizer.fullname" . }}-config
+              env:
+                - name: POSTGRES_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      {{- if .Values.externalSecrets.enabled }}
+                      name: {{ .Values.externalSecrets.dbSecretName }}
+                      {{- else }}
+                      name: {{ include "cost-optimizer.fullname" . }}-secrets
+                      {{- end }}
+                      key: database-password
+                - name: SECRET_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "cost-optimizer.fullname" . }}-secrets
+                      key: secret-key
+          {{- with .Values.nodeSelector }}
+          nodeSelector:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.tolerations }}
+          tolerations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}
