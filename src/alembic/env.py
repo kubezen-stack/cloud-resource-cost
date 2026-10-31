@@ -5,6 +5,7 @@ from sqlalchemy import pool
 from app.models.user import User
 from app.models.cost_service import CostService
 from app.models.cost_anomaly import CostAnomaly
+from app.models.rightsizing_recommendation import RightsizingRecommendation
 from app.models.aws_account import AWSaccount
 from app.core.database import Base
 from app.core.config import settings
