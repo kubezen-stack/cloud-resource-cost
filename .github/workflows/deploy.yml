@@ -314,12 +314,14 @@ jobs:
           APP_SECRET: ${{ secrets.APP_SECRET_KEY }}
           DB_PASS: ${{ steps.db.outputs.db_password }}
           APP_HOST: ${{ steps.tf.outputs.app_host }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
         run: |
           helm upgrade --install cost-optimizer ./helm/cost-optimizer \
           -f ./helm/cost-optimizer/values-${{ env.ENVIRONMENT }}.yaml \
           --set image.repository=${{ steps.tf.outputs.ecr_url }} \
           --set image.tag=${{ needs.build-and-push.outputs.image_tag }} \
           --set app.secretKey=$APP_SECRET \
+          --set-string llm.apiKey="$LLM_API_KEY" \
           --set postgresql.enabled=${{ steps.db.outputs.postgresql_enabled }} \
           --set database.host=${{ steps.db.outputs.db_host }} \
           --set database.port=${{ steps.db.outputs.db_port }} \
