@@ -29,6 +29,15 @@ class Settings(BaseSettings):
     
     BACKEND_CORS_ORIGINS: List[str] = []
 
+    LLM_PROVIDER: str = "openai"
+    LLM_API_KEY: str = ""
+    LLM_BASE_URL: str = "https://api.openai.com/v1"
+    LLM_MODEL: str = "gpt-4o-mini"
+    EMBEDDING_MODEL: str = "text-embedding-3-small"
+    LLM_TIMEOUT_SECONDS: float = 60.0
+    ADVISOR_MAX_REQUIREMENTS_CHARS: int = 8000
+    ADVISOR_RATE_LIMIT_PER_HOUR: int = 10
+
     class Config:
         env_file = "dev/.env"
         case_sensitive = True
