@@ -6,13 +6,14 @@ failure) and drop citations that were not actually retrieved.
 """
 import json
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List
 
 from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.schemas.advisor import AdvisorPlan
+from app.services.capacity import add_measurement_question, check_capacity
 from app.services.knowledge_base import RetrievedChunk, retrieve_multi
 from app.services.llm_client import LLMClient, LLMError
 
@@ -43,6 +44,9 @@ How to work:
 - Managed services (load balancers, S3, CloudFront, SQS, ...) have no instance count: describe their configuration (for example "spread across 2 Availability Zones") instead of inventing instances.
 - For a production architecture cover each of these areas that applies, or say why it does not: compute and auto scaling, load balancing, database with its storage and backups, caching, static content and CDN, network and security (private subnets, security groups, encryption), monitoring.
 - Show how you reached the sizing: state the capacity reasoning (requests per second, CPU per request) in the rationale, and mark every number the customer did not give as an assumption.
+- Capacity: for request driven workloads fill "capacity". peak_rps comes from the customer. cpu_ms_per_request is "customer" only if the customer gave it, otherwise "assumption": estimate it for the kind of application, do not copy the numbers of the catalog examples. Keep target_utilisation between 0.5 and 0.6 and set availability_zones to the number of zones you use.
+- Compute components: set role "compute", instance_count (the minimum, at least one per zone), max_instances (the auto scaling limit) and vcpu_per_instance. The code checks that max_instances x vcpu_per_instance covers peak_rps x cpu_ms_per_request / 1000 / target_utilisation, so do the arithmetic. Give every other component the fitting role.
+- Production defaults: product images and static files in S3 served through CloudFront; a Multi-AZ database with automated backups mentioned in its component; a cache with a replica when availability is required; avoid burstable instance classes for sustained production load.
 - Facts the customer did not state (traffic pattern, growth, compliance) go to "open_questions". Use "assumptions" only for the working values you need in order to size.
 - Use the customer's region and Availability Zone names (for example eu-central-1a and eu-central-1b) where known.
 - Never invent numbers the customer did not give. Put every assumption in "assumptions" and every missing fact in "open_questions". Mention real risks and trade-offs in "risks".
@@ -52,8 +56,9 @@ How to work:
 Answer with one JSON object and nothing else, with this shape:
 {
   "summary": string,
+  "capacity": {"peak_rps": number, "cpu_ms_per_request": number, "cpu_ms_source": "customer" | "assumption", "target_utilisation": number, "availability_zones": integer} or null,
   "assumptions": [string],
-  "components": [{"name": string, "aws_service": string, "sizing": string, "rationale": string, "basis": "catalog" | "general_knowledge", "sources": [string]}],
+  "components": [{"name": string, "aws_service": string, "sizing": string, "rationale": string, "basis": "catalog" | "general_knowledge", "sources": [string], "role": "compute" | "database" | "cache" | "network" | "storage" | "monitoring" | "other", "instance_count": integer or null, "max_instances": integer or null, "vcpu_per_instance": integer or null}],
   "open_questions": [string],
   "risks": [string]
 }
@@ -72,6 +77,7 @@ class KnowledgeBaseEmpty(AdvisorError):
 class AdvisorResult:
     plan: AdvisorPlan
     sources: List[RetrievedChunk]
+    warnings: List[str] = field(default_factory=list)
 
 
 def build_user_prompt(requirements: str, chunks: List[RetrievedChunk]) -> str:
@@ -93,16 +99,10 @@ def _keep_known_sources(plan: AdvisorPlan, chunks: List[RetrievedChunk]) -> Advi
     return plan
 
 
-async def recommend(db: AsyncSession, llm: LLMClient, requirements: str) -> AdvisorResult:
-    queries = [requirements] + [f"{probe}. Customer needs: {requirements}" for probe in TOPIC_PROBES]
-    chunks = await retrieve_multi(db, llm, queries, per_query=PER_TOPIC, limit=MAX_CHUNKS)
-    if not chunks:
-        raise KnowledgeBaseEmpty("Knowledge base is empty: run the ingestion job first")
-
-    user_prompt = build_user_prompt(requirements, chunks)
+async def _generate(llm: LLMClient, user_prompt: str) -> AdvisorPlan:
     raw = await llm.complete_json(SYSTEM_PROMPT, user_prompt)
     try:
-        plan = _parse_plan(raw)
+        return _parse_plan(raw)
     except (ValueError, ValidationError) as first_error:
         logger.warning("Advisor answer failed validation, retrying once: %s", type(first_error).__name__)
         retry_prompt = (
@@ -111,8 +111,38 @@ async def recommend(db: AsyncSession, llm: LLMClient, requirements: str) -> Advi
         )
         raw = await llm.complete_json(SYSTEM_PROMPT, retry_prompt)
         try:
-            plan = _parse_plan(raw)
+            return _parse_plan(raw)
         except (ValueError, ValidationError) as e:
             raise AdvisorError("The model did not return a valid recommendation") from e
 
-    return AdvisorResult(plan=_keep_known_sources(plan, chunks), sources=chunks)
+
+async def recommend(db: AsyncSession, llm: LLMClient, requirements: str) -> AdvisorResult:
+    queries = [requirements] + [f"{probe}. Customer needs: {requirements}" for probe in TOPIC_PROBES]
+    chunks = await retrieve_multi(db, llm, queries, per_query=PER_TOPIC, limit=MAX_CHUNKS)
+    if not chunks:
+        raise KnowledgeBaseEmpty("Knowledge base is empty: run the ingestion job first")
+
+    user_prompt = build_user_prompt(requirements, chunks)
+    plan = await _generate(llm, user_prompt)
+
+    findings = check_capacity(plan)
+    blocking = [f for f in findings if f.blocking]
+    if blocking:
+        logger.info("Advisor plan failed capacity checks, asking the model to fix it once")
+        feedback = "\n".join(f"- {f.message}" for f in blocking)
+        fix_prompt = (
+            f"{user_prompt}\n\nYour previous answer:\n{plan.model_dump_json()}\n\n"
+            f"Automatic checks found problems:\n{feedback}\n"
+            "Correct the sizing (instance_count, max_instances, vcpu_per_instance) and answer again "
+            "with only the JSON object."
+        )
+        try:
+            fixed = _parse_plan(await llm.complete_json(SYSTEM_PROMPT, fix_prompt))
+            fixed_findings = check_capacity(fixed)
+            if sum(f.blocking for f in fixed_findings) <= len(blocking):
+                plan, findings = fixed, fixed_findings
+        except (ValueError, ValidationError):
+            logger.warning("Capacity fix answer was invalid, keeping the first plan with warnings")
+
+    plan = add_measurement_question(_keep_known_sources(plan, chunks))
+    return AdvisorResult(plan=plan, sources=chunks, warnings=[f.message for f in findings])

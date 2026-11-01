@@ -55,6 +55,7 @@ async def test_recommend_returns_plan_with_sources(client, auth_headers, loaded_
     assert 1 <= len(data["sources"]) <= 14
     assert data["plan"]["components"][0]["basis"] == "general_knowledge"
     assert "verified" in data["note"]
+    assert data["warnings"] == []
 
 
 @pytest.mark.asyncio

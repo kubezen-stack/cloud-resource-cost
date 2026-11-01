@@ -83,4 +83,5 @@ async def recommend_architecture(
         plan=result.plan,
         sources=[SourceRef(reference=c.reference, score=c.score) for c in result.sources],
         model=llm.model,
+        warnings=result.warnings,
     )

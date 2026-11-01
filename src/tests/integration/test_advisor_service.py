@@ -137,3 +137,56 @@ async def test_prompt_allows_general_knowledge_but_requires_labelling(db_session
     system, _ = llm.calls[0]
     assert "general AWS knowledge" in system
     assert '"basis"' in system
+
+
+def sized_plan(count, max_count, vcpu=2):
+    data = json.loads(plan())
+    data["capacity"] = {"peak_rps": 200, "cpu_ms_per_request": 20, "cpu_ms_source": "assumption",
+                        "target_utilisation": 0.6, "availability_zones": 2}
+    data["components"][0].update(role="compute", instance_count=count, max_instances=max_count, vcpu_per_instance=vcpu)
+    return json.dumps(data)
+
+
+@pytest.mark.asyncio
+async def test_capacity_shortfall_triggers_one_fix_request(db_session):
+    llm = FakeLLM([sized_plan(2, 2), sized_plan(2, 4)])
+    await sync_catalog(db_session, llm)
+
+    result = await recommend(db_session, llm, REQUIREMENTS)
+
+    assert len(llm.calls) == 2
+    assert "Automatic checks" in llm.calls[1][1] and "6.7" in llm.calls[1][1]
+    assert result.warnings == []
+    assert result.plan.components[0].max_instances == 4
+    assert any("measure" in q for q in result.plan.open_questions)
+
+
+@pytest.mark.asyncio
+async def test_unfixed_shortfall_is_kept_with_warning(db_session):
+    llm = FakeLLM([sized_plan(2, 2), sized_plan(2, 2)])
+    await sync_catalog(db_session, llm)
+
+    result = await recommend(db_session, llm, REQUIREMENTS)
+
+    assert len(llm.calls) == 2
+    assert result.warnings and "vCPU" in result.warnings[0]
+
+
+@pytest.mark.asyncio
+async def test_invalid_fix_answer_keeps_first_plan(db_session):
+    llm = FakeLLM([sized_plan(2, 2), "not json"])
+    await sync_catalog(db_session, llm)
+
+    result = await recommend(db_session, llm, REQUIREMENTS)
+
+    assert result.warnings and result.plan.components[0].max_instances == 2
+
+
+@pytest.mark.asyncio
+async def test_correct_plan_needs_single_call(db_session):
+    llm = FakeLLM([sized_plan(2, 4)])
+    await sync_catalog(db_session, llm)
+
+    result = await recommend(db_session, llm, REQUIREMENTS)
+
+    assert len(llm.calls) == 1 and result.warnings == []
