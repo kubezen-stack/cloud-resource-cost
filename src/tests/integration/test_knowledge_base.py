@@ -86,3 +86,31 @@ async def test_retrieve_ignores_chunks_from_another_embedding_model(db_session):
     llm.embedding_model = "another-model"
 
     assert await retrieve(db_session, llm, "one") == []
+
+
+@pytest.mark.asyncio
+async def test_retrieve_multi_merges_topics_and_dedupes(db_session):
+    from app.services.knowledge_base import retrieve_multi
+    llm = FakeLLM()
+    await sync_catalog(db_session, llm)
+
+    results = await retrieve_multi(
+        db_session, llm,
+        ["application load balancer health checks", "rds multi-az backups", "application load balancer health checks"],
+        per_query=2, limit=10,
+    )
+
+    refs = [r.reference for r in results]
+    assert len(refs) == len(set(refs))
+    assert 2 <= len(refs) <= 4
+    assert [r.score for r in results] == sorted((r.score for r in results), reverse=True)
+    assert len(llm.embedded) >= 3
+
+
+@pytest.mark.asyncio
+async def test_retrieve_multi_empty_cases(db_session):
+    from app.services.knowledge_base import retrieve_multi
+    llm = FakeLLM()
+    assert await retrieve_multi(db_session, llm, ["anything"]) == []
+    await sync_catalog(db_session, llm)
+    assert await retrieve_multi(db_session, llm, []) == []

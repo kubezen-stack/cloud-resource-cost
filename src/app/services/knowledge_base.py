@@ -140,6 +140,40 @@ async def sync_catalog(
     return SyncResult(added, updated, removed, unchanged)
 
 
+async def retrieve_multi(
+    db: AsyncSession, llm: LLMClient, queries: List[str], per_query: int = 3, limit: int = 12
+) -> List[RetrievedChunk]:
+    """Search with several queries at once and merge the results.
+
+    Each query contributes its own top matches, so topics that the main question
+    only touches indirectly (networking, caching, ...) are still covered.
+    One embeddings request is made for all queries.
+    """
+    rows = (
+        await db.execute(select(KnowledgeChunk).where(KnowledgeChunk.embedding_model == llm.embedding_model))
+    ).scalars().all()
+    if not rows or not queries:
+        return []
+
+    vectors = await llm.embed(queries)
+    matrix = np.asarray([r.embedding for r in rows], dtype=float)
+    row_norms = np.linalg.norm(matrix, axis=1)
+
+    best: Dict[int, float] = {}
+    for vector in vectors:
+        query_array = np.asarray(vector, dtype=float)
+        norms = row_norms * np.linalg.norm(query_array)
+        scores = (matrix @ query_array) / np.where(norms == 0, 1.0, norms)
+        for index in np.argsort(-scores)[:per_query]:
+            best[int(index)] = max(best.get(int(index), -1.0), float(scores[index]))
+
+    ordered = sorted(best.items(), key=lambda item: item[1], reverse=True)[:limit]
+    return [
+        RetrievedChunk(rows[i].source, rows[i].heading, rows[i].content, round(score, 4))
+        for i, score in ordered
+    ]
+
+
 async def retrieve(db: AsyncSession, llm: LLMClient, query: str, k: int = 6) -> List[RetrievedChunk]:
     """Return the k chunks most similar to the query (cosine similarity)."""
     rows = (

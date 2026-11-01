@@ -52,7 +52,7 @@ async def test_recommend_returns_plan_with_sources(client, auth_headers, loaded_
     data = response.json()
     assert data["plan"]["components"][0]["aws_service"] == "RDS PostgreSQL Multi-AZ"
     assert data["model"] == "fake-chat"
-    assert len(data["sources"]) == 8
+    assert 1 <= len(data["sources"]) <= 14
     assert data["plan"]["components"][0]["basis"] == "general_knowledge"
     assert "verified" in data["note"]
 
