@@ -48,6 +48,12 @@ spec:
             secretKeyRef:
               name: {{ include "cost-optimizer.fullname" . }}-secrets
               key: secret-key
+        - name: LLM_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "cost-optimizer.fullname" . }}-secrets
+              key: llm-api-key
+              optional: true
         - name: POSTGRES_PASSWORD
           valueFrom:
             secretKeyRef:

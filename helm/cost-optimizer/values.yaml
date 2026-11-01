@@ -108,3 +108,10 @@ anomalyDetection:
     limits:
       cpu: 500m
       memory: 768Mi
+
+llm:
+  provider: openai
+  baseUrl: "https://api.openai.com/v1"
+  model: gpt-4o-mini
+  embeddingModel: text-embedding-3-small
+  apiKey: ""

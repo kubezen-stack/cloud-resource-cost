@@ -19,6 +19,11 @@ data:
   POSTGRES_DB: {{ .Values.database.name | quote }}
   POSTGRES_USER: {{ .Values.database.user | quote }}
 
+  LLM_PROVIDER: {{ .Values.llm.provider | quote }}
+  LLM_BASE_URL: {{ .Values.llm.baseUrl | quote }}
+  LLM_MODEL: {{ .Values.llm.model | quote }}
+  EMBEDDING_MODEL: {{ .Values.llm.embeddingModel | quote }}
+
   {{- if .Values.app.corsOrigins }}
   CORS_ORIGINS: {{ .Values.app.corsOrigins | join "," | quote }}
   {{- end }}
