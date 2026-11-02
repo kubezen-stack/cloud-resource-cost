@@ -143,7 +143,7 @@ def sized_plan(count, max_count, vcpu=2):
     data = json.loads(plan())
     data["capacity"] = {"peak_rps": 200, "peak_rps_source": "customer", "cpu_ms_per_request": 20, "cpu_ms_source": "assumption",
                         "target_utilisation": 0.6, "availability_zones": 2}
-    data["components"][0].update(role="compute", instance_count=count, max_instances=max_count, vcpu_per_instance=vcpu)
+    data["components"][0].update(role="compute", instance_class="m6i.large", instance_count=count, max_instances=max_count, vcpu_per_instance=vcpu)
     data["components"].append({"name": "Network security", "aws_service": "VPC", "sizing": "private subnets",
                                "rationale": "isolation", "role": "security"})
     return json.dumps(data)
@@ -214,7 +214,8 @@ async def test_missing_database_size_is_fixed_by_second_answer(db_session):
     bad["components"].append({"name": "DB", "aws_service": "RDS", "sizing": "Multi-AZ", "rationale": "r", "role": "database"})
     good = json.loads(sized_plan(2, 6))
     good["components"].append({"name": "DB", "aws_service": "RDS", "sizing": "Multi-AZ", "rationale": "r",
-                               "role": "database", "instance_class": "db.m6g.large", "storage_gb": 100})
+                               "role": "database", "instance_class": "db.m6g.large", "storage_gb": 100,
+                               "multi_az": True})
     llm = FakeLLM([json.dumps(bad), json.dumps(good)])
     await sync_catalog(db_session, llm)
 

@@ -21,6 +21,8 @@ class Component(BaseModel):
     # Databases and caches: node/instance class (for example db.m6g.large) and, for databases, storage.
     instance_class: Optional[str] = Field(default=None, max_length=64)
     storage_gb: Optional[int] = Field(default=None, ge=1, le=1_000_000)
+    multi_az: Optional[bool] = None
+    replicas: Optional[int] = Field(default=None, ge=0, le=5)
 
 
 class CapacityInputs(BaseModel):
@@ -28,6 +30,7 @@ class CapacityInputs(BaseModel):
     peak_rps: float = Field(gt=0, le=1_000_000)
     peak_rps_source: Literal["customer", "assumption"] = "assumption"
     cpu_ms_per_request: float = Field(gt=0, le=60_000)
+    # "customer": stated in the requirements. "assumption": estimated by the model.
     cpu_ms_source: Literal["customer", "assumption"] = "assumption"
     target_utilisation: float = Field(default=0.6, ge=0.3, le=0.8)
     availability_zones: int = Field(default=2, ge=1, le=6)

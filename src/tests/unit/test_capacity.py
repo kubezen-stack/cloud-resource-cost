@@ -9,7 +9,7 @@ def make_plan(count=4, max_count=6, vcpu=2, capacity=True, source="assumption", 
         "summary": "s",
         "capacity": {"peak_rps": 200, "peak_rps_source": "customer", "cpu_ms_per_request": 20, "cpu_ms_source": source,
                      "target_utilisation": 0.6, "availability_zones": zones, "data_size_gb": data_gb} if capacity else None,
-        "components": [{"name": "app", "aws_service": "EC2", "sizing": "x", "rationale": "r", "role": "compute",
+        "components": [{"name": "app", "aws_service": "EC2", "sizing": "x", "rationale": "r", "role": "compute", "instance_class": "m6i.large",
                         "instance_count": count, "max_instances": max_count, "vcpu_per_instance": vcpu},
                        {"name": "sec", "aws_service": "VPC", "sizing": "x", "rationale": "r", "role": "security"}],
         "open_questions": questions or [],
@@ -89,11 +89,12 @@ def test_zone_loss_not_checked_for_single_zone():
 
 
 def data_plan(**database):
-    component = {"name": "db", "aws_service": "RDS", "sizing": "x", "rationale": "r", "role": "database", **database}
+    component = {"name": "db", "aws_service": "RDS", "sizing": "x", "rationale": "r", "role": "database",
+                 "multi_az": True, **database}
     return AdvisorPlan.model_validate({
         "summary": "s", "capacity": {"peak_rps": 1, "cpu_ms_per_request": 1, "data_size_gb": 50},
         "components": [component, {"name": "cache", "aws_service": "ElastiCache", "sizing": "x", "rationale": "r",
-                                   "role": "cache", "instance_class": "cache.t4g.medium"}]})
+                                   "role": "cache", "instance_class": "cache.t4g.medium", "replicas": 1}]})
 
 
 def test_database_without_class_and_storage_is_flagged():
@@ -140,3 +141,18 @@ def test_assumed_peak_traffic_adds_open_question_once():
     plan = add_measurement_question(plan)
     assert len(plan.open_questions) == 1 and "peak traffic" in plan.open_questions[0]
     assert len(add_measurement_question(plan).open_questions) == 1
+
+
+def test_compute_without_instance_class_is_flagged():
+    plan = make_plan()
+    plan.components[0].instance_class = None
+    findings = check_data_tier(plan)
+    assert [f.code for f in findings] == ["missing_size"] and "m6i.large" in findings[0].message
+
+
+def test_database_needs_multi_az_and_cache_needs_replicas():
+    plan = data_plan(instance_class="db.m6g.large", storage_gb=100)
+    plan.components[0].multi_az = None
+    plan.components[1].replicas = None
+    messages = [f.message for f in check_data_tier(plan)]
+    assert any("multi_az" in m for m in messages) and any("replicas" in m for m in messages)

@@ -95,6 +95,14 @@ def check_data_tier(plan: AdvisorPlan) -> List[Finding]:
     """Databases and caches need a concrete class, databases also storage that fits the data."""
     findings: List[Finding] = []
     for component in plan.components:
+        if component.role == "compute" and component.instance_count and not component.instance_class:
+            findings.append(Finding(
+                "missing_size", f"'{component.name}' has no instance_class (for example m6i.large).", blocking=True))
+        if component.role == "database" and component.multi_az is None:
+            findings.append(Finding("missing_size", f"'{component.name}' has no multi_az value.", blocking=True))
+        if component.role == "cache" and component.replicas is None:
+            findings.append(Finding(
+                "missing_size", f"'{component.name}' has no replicas value (0 for a single node).", blocking=True))
         if component.role in ("database", "cache") and not component.instance_class:
             findings.append(Finding(
                 "missing_size", f"'{component.name}' has no instance_class (for example db.m6g.large).", blocking=True))
