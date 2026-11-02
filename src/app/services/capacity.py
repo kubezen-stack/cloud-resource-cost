@@ -25,6 +25,16 @@ def required_vcpu(capacity: CapacityInputs) -> float:
     return capacity.peak_rps * capacity.cpu_ms_per_request / 1000.0 / capacity.target_utilisation
 
 
+def required_peak_vcpu(capacity: CapacityInputs) -> float:
+    """Total vCPU at peak (summed over compute components) that satisfies every capacity check."""
+    needed = required_vcpu(capacity)
+    zones = capacity.availability_zones
+    if zones < 2:
+        return needed
+    after_loss = capacity.peak_rps * capacity.cpu_ms_per_request / 1000.0 / ZONE_LOSS_UTILISATION
+    return max(needed, after_loss * zones / (zones - 1))
+
+
 def check_capacity(plan: AdvisorPlan) -> List[Finding]:
     compute = [c for c in plan.components if c.role == "compute" and c.instance_count and c.vcpu_per_instance]
     findings: List[Finding] = []
@@ -122,12 +132,17 @@ def check_plan(plan: AdvisorPlan) -> List[Finding]:
 def add_measurement_question(plan: AdvisorPlan) -> AdvisorPlan:
     """CPU time per request estimated by the model must be measured by the customer."""
     capacity = plan.capacity
-    if capacity is None or capacity.cpu_ms_source != "assumption":
+    if capacity is None:
         return plan
-    if any("cpu" in q.lower() and "request" in q.lower() for q in plan.open_questions):
-        return plan
-    plan.open_questions.append(
-        f"How much CPU time does one request really need? {capacity.cpu_ms_per_request:g} ms was assumed: "
-        "measure it with a load test and the sizing will be recalculated."
-    )
+    questions = [q.lower() for q in plan.open_questions]
+    if capacity.peak_rps_source == "assumption" and not any("peak traffic" in q for q in questions):
+        plan.open_questions.append(
+            f"What is the real peak traffic? {capacity.peak_rps:g} requests per second was assumed: "
+            "confirm it and the sizing will be recalculated."
+        )
+    if capacity.cpu_ms_source == "assumption" and not any("cpu" in q and "request" in q for q in questions):
+        plan.open_questions.append(
+            f"How much CPU time does one request really need? {capacity.cpu_ms_per_request:g} ms was assumed: "
+            "measure it with a load test and the sizing will be recalculated."
+        )
     return plan

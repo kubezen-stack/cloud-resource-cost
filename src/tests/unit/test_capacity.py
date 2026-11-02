@@ -1,13 +1,13 @@
 import pytest
 
 from app.schemas.advisor import AdvisorPlan, CapacityInputs
-from app.services.capacity import add_measurement_question, check_capacity, check_data_tier, check_plan, check_security, required_vcpu
+from app.services.capacity import add_measurement_question, check_capacity, check_data_tier, check_plan, check_security, required_peak_vcpu, required_vcpu
 
 
 def make_plan(count=4, max_count=6, vcpu=2, capacity=True, source="assumption", zones=2, questions=None, data_gb=None):
     return AdvisorPlan.model_validate({
         "summary": "s",
-        "capacity": {"peak_rps": 200, "cpu_ms_per_request": 20, "cpu_ms_source": source,
+        "capacity": {"peak_rps": 200, "peak_rps_source": "customer", "cpu_ms_per_request": 20, "cpu_ms_source": source,
                      "target_utilisation": 0.6, "availability_zones": zones, "data_size_gb": data_gb} if capacity else None,
         "components": [{"name": "app", "aws_service": "EC2", "sizing": "x", "rationale": "r", "role": "compute",
                         "instance_count": count, "max_instances": max_count, "vcpu_per_instance": vcpu},
@@ -125,3 +125,18 @@ def test_missing_security_is_blocking_only_for_multi_zone_plans():
 
 def test_check_plan_combines_all_checks():
     assert check_plan(make_plan()) == []
+
+
+def test_required_peak_vcpu_covers_zone_loss():
+    capacity = CapacityInputs(peak_rps=200, cpu_ms_per_request=20, target_utilisation=0.6, availability_zones=2)
+    assert required_peak_vcpu(capacity) == pytest.approx(2 * 200 * 0.02 / 0.85, abs=1e-6)  # 9.41
+    single = CapacityInputs(peak_rps=200, cpu_ms_per_request=20, target_utilisation=0.6, availability_zones=1)
+    assert required_peak_vcpu(single) == pytest.approx(required_vcpu(single))
+
+
+def test_assumed_peak_traffic_adds_open_question_once():
+    plan = make_plan(source="customer")
+    plan.capacity.peak_rps_source = "assumption"
+    plan = add_measurement_question(plan)
+    assert len(plan.open_questions) == 1 and "peak traffic" in plan.open_questions[0]
+    assert len(add_measurement_question(plan).open_questions) == 1

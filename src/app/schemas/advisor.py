@@ -26,6 +26,7 @@ class Component(BaseModel):
 class CapacityInputs(BaseModel):
     """Numbers the sizing is based on. The code, not the model, checks the arithmetic."""
     peak_rps: float = Field(gt=0, le=1_000_000)
+    peak_rps_source: Literal["customer", "assumption"] = "assumption"
     cpu_ms_per_request: float = Field(gt=0, le=60_000)
     cpu_ms_source: Literal["customer", "assumption"] = "assumption"
     target_utilisation: float = Field(default=0.6, ge=0.3, le=0.8)

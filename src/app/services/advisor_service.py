@@ -6,6 +6,7 @@ failure) and drop citations that were not actually retrieved.
 """
 import json
 import logging
+import math
 from dataclasses import dataclass, field
 from typing import List
 
@@ -13,7 +14,7 @@ from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.schemas.advisor import AdvisorPlan
-from app.services.capacity import Finding, add_measurement_question, check_plan
+from app.services.capacity import Finding, add_measurement_question, check_plan, required_peak_vcpu
 from app.services.knowledge_base import RetrievedChunk, retrieve_multi
 from app.services.llm_client import LLMClient, LLMError
 
@@ -21,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 PER_TOPIC = 3
 MAX_CHUNKS = 14
+MAX_FIX_ATTEMPTS = 2
 
 TOPIC_PROBES = [
     "compute instances sizing web application servers auto scaling",
@@ -44,7 +46,7 @@ How to work:
 - Managed services (load balancers, S3, CloudFront, SQS, ...) have no instance count: describe their configuration (for example "spread across 2 Availability Zones") instead of inventing instances.
 - For a production architecture cover each of these areas that applies, or say why it does not: compute and auto scaling, load balancing, database with its storage and backups, caching, static content and CDN, network and security (private subnets, security groups, encryption), monitoring.
 - Show how you reached the sizing: state the capacity reasoning (requests per second, CPU per request) in the rationale, and mark every number the customer did not give as an assumption.
-- Capacity: for request driven workloads fill "capacity". peak_rps comes from the customer. cpu_ms_per_request is "customer" only if the customer gave it, otherwise "assumption": estimate it for the kind of application, do not copy the numbers of the catalog examples. Keep target_utilisation between 0.5 and 0.6 and set availability_zones to the number of zones you use.
+- Capacity: for request driven workloads fill "capacity". peak_rps_source is "customer" when the requirements state the traffic or it follows directly from them (for example visitors per day), otherwise "assumption". If the customer gave no traffic figures and none can be derived, set capacity to null, propose a small starting setup and ask for the traffic in open_questions: never invent a peak. cpu_ms_per_request is "customer" only if the customer gave it, otherwise "assumption": estimate it for the kind of application, do not copy the numbers of the catalog examples. Keep target_utilisation between 0.5 and 0.6 and set availability_zones to the number of zones you use.
 - Compute components: set role "compute", instance_count (the minimum, at least one per zone), max_instances (the auto scaling limit) and vcpu_per_instance. The code checks that max_instances x vcpu_per_instance covers peak_rps x cpu_ms_per_request / 1000 / target_utilisation, so do the arithmetic. Give every other component the fitting role.
 - Databases and caches: set instance_class (for example db.m6g.large, cache.t4g.medium) and, for databases, storage_gb with room to grow (at least 30 percent above the data the customer stated; put that figure in capacity.data_size_gb). Do not leave sizes out.
 - High availability: with two or more zones, the servers left after losing one zone must still carry the peak at no more than 85 percent utilisation, so max_instances x vcpu_per_instance must be about twice what one zone needs.
@@ -59,7 +61,7 @@ How to work:
 Answer with one JSON object and nothing else, with this shape:
 {
   "summary": string,
-  "capacity": {"peak_rps": number, "cpu_ms_per_request": number, "cpu_ms_source": "customer" | "assumption", "target_utilisation": number, "availability_zones": integer, "data_size_gb": number or null} or null,
+  "capacity": {"peak_rps": number, "peak_rps_source": "customer" | "assumption", "cpu_ms_per_request": number, "cpu_ms_source": "customer" | "assumption", "target_utilisation": number, "availability_zones": integer, "data_size_gb": number or null} or null,
   "assumptions": [string],
   "components": [{"name": string, "aws_service": string, "sizing": string, "rationale": string, "basis": "catalog" | "general_knowledge", "sources": [string], "role": "compute" | "database" | "cache" | "network" | "storage" | "security" | "monitoring" | "other", "instance_count": integer or null, "max_instances": integer or null, "vcpu_per_instance": integer or null, "instance_class": string or null, "storage_gb": integer or null}],
   "open_questions": [string],
@@ -133,10 +135,17 @@ async def recommend(db: AsyncSession, llm: LLMClient, requirements: str) -> Advi
     plan = await _generate(llm, user_prompt)
 
     findings = check_plan(plan)
-    blocking = [f for f in findings if f.blocking]
-    if blocking:
-        logger.info("Advisor plan failed capacity checks, asking the model to fix it once")
+    for attempt in range(MAX_FIX_ATTEMPTS):
+        blocking = [f for f in findings if f.blocking]
+        if not blocking:
+            break
+        logger.info("Advisor plan failed automatic checks, asking the model to fix it (attempt %d)", attempt + 1)
         feedback = "\n".join(f"- {f.message}" for f in blocking)
+        if plan.capacity and any(f.code in ("shortfall", "zone_loss") for f in blocking):
+            feedback += (
+                f"\n- Total peak vCPU (max_instances x vcpu_per_instance, summed over compute components) "
+                f"must be at least {math.ceil(required_peak_vcpu(plan.capacity))}."
+            )
         fix_prompt = (
             f"{user_prompt}\n\nYour previous answer:\n{plan.model_dump_json()}\n\n"
             f"Automatic checks found problems:\n{feedback}\n"
@@ -145,11 +154,12 @@ async def recommend(db: AsyncSession, llm: LLMClient, requirements: str) -> Advi
         )
         try:
             fixed = _parse_plan(await llm.complete_json(SYSTEM_PROMPT, fix_prompt))
-            fixed_findings = check_plan(fixed)
-            if sum(f.blocking for f in fixed_findings) <= len(blocking):
-                plan, findings = fixed, fixed_findings
         except (ValueError, ValidationError):
-            logger.warning("Capacity fix answer was invalid, keeping the first plan with warnings")
+            logger.warning("Fix answer was invalid, keeping the previous plan with warnings")
+            break
+        fixed_findings = check_plan(fixed)
+        if sum(f.blocking for f in fixed_findings) <= len(blocking):
+            plan, findings = fixed, fixed_findings
 
     plan = add_measurement_question(_keep_known_sources(plan, chunks))
     return AdvisorResult(plan=plan, sources=chunks, findings=findings)

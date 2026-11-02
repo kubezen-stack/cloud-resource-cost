@@ -141,7 +141,7 @@ async def test_prompt_allows_general_knowledge_but_requires_labelling(db_session
 
 def sized_plan(count, max_count, vcpu=2):
     data = json.loads(plan())
-    data["capacity"] = {"peak_rps": 200, "cpu_ms_per_request": 20, "cpu_ms_source": "assumption",
+    data["capacity"] = {"peak_rps": 200, "peak_rps_source": "customer", "cpu_ms_per_request": 20, "cpu_ms_source": "assumption",
                         "target_utilisation": 0.6, "availability_zones": 2}
     data["components"][0].update(role="compute", instance_count=count, max_instances=max_count, vcpu_per_instance=vcpu)
     data["components"].append({"name": "Network security", "aws_service": "VPC", "sizing": "private subnets",
@@ -165,12 +165,12 @@ async def test_capacity_shortfall_triggers_one_fix_request(db_session):
 
 @pytest.mark.asyncio
 async def test_unfixed_shortfall_is_kept_with_warning(db_session):
-    llm = FakeLLM([sized_plan(2, 2), sized_plan(2, 2)])
+    llm = FakeLLM([sized_plan(2, 2)] * 3)
     await sync_catalog(db_session, llm)
 
     result = await recommend(db_session, llm, REQUIREMENTS)
 
-    assert len(llm.calls) == 2
+    assert len(llm.calls) == 3
     assert result.warnings and "vCPU" in result.warnings[0]
 
 
@@ -222,3 +222,26 @@ async def test_missing_database_size_is_fixed_by_second_answer(db_session):
 
     assert len(llm.calls) == 2 and "instance_class" in llm.calls[1][1]
     assert result.warnings == []
+
+
+@pytest.mark.asyncio
+async def test_second_fix_attempt_gets_exact_minimum_in_feedback(db_session):
+    llm = FakeLLM([sized_plan(2, 2), sized_plan(2, 4), sized_plan(2, 6)])
+    await sync_catalog(db_session, llm)
+
+    result = await recommend(db_session, llm, REQUIREMENTS)
+
+    assert len(llm.calls) == 3
+    assert "at least 10" in llm.calls[1][1]  # ceil(9.41)
+    assert result.warnings == [] and result.plan.components[0].max_instances == 6
+
+
+@pytest.mark.asyncio
+async def test_fix_attempts_are_limited(db_session):
+    llm = FakeLLM([sized_plan(2, 2)] * 3 + [sized_plan(2, 2)] * 3)
+    await sync_catalog(db_session, llm)
+
+    result = await recommend(db_session, llm, REQUIREMENTS)
+
+    assert len(llm.calls) == 3
+    assert result.warnings
