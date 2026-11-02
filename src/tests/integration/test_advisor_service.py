@@ -190,3 +190,17 @@ async def test_correct_plan_needs_single_call(db_session):
     result = await recommend(db_session, llm, REQUIREMENTS)
 
     assert len(llm.calls) == 1 and result.warnings == []
+
+
+@pytest.mark.asyncio
+async def test_missing_capacity_is_informational_not_blocking(db_session):
+    data = json.loads(sized_plan(2, 4))
+    data["capacity"] = None
+    llm = FakeLLM([json.dumps(data)])
+    await sync_catalog(db_session, llm)
+
+    result = await recommend(db_session, llm, REQUIREMENTS)
+
+    assert len(llm.calls) == 1
+    assert result.findings and all(f.informational for f in result.findings)
+    assert "not verified" in result.warnings[0]

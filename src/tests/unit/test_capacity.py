@@ -51,13 +51,15 @@ def test_max_below_count_is_blocking():
 
 
 def test_no_capacity_inputs_is_flagged():
-    assert codes(make_plan(capacity=False)) == {"unverified"}
+    findings = check_capacity(make_plan(capacity=False))
+    assert [f.code for f in findings] == ["unverified"] and findings[0].informational
 
 
 def test_compute_without_sizes_cannot_be_verified():
     plan = make_plan()
     plan.components[0].vcpu_per_instance = None
-    assert codes(plan) == {"no_compute"}
+    findings = check_capacity(plan)
+    assert [f.code for f in findings] == ["no_compute"] and findings[0].informational
 
 
 def test_plan_without_compute_and_capacity_has_no_findings():

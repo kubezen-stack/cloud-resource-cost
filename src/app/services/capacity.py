@@ -11,6 +11,7 @@ class Finding:
     code: str
     message: str
     blocking: bool = False
+    informational: bool = False
 
 
 def required_vcpu(capacity: CapacityInputs) -> float:
@@ -25,11 +26,11 @@ def check_capacity(plan: AdvisorPlan) -> List[Finding]:
 
     if capacity is None:
         if compute:
-            findings.append(Finding("unverified", "Capacity inputs were not given, so the compute sizing is not verified."))
+            findings.append(Finding("unverified", "Capacity inputs were not given, so the compute sizing is not verified.", informational=True))
         return findings
     if not compute:
         findings.append(Finding(
-            "no_compute", "No compute component has instance_count and vcpu_per_instance, so capacity cannot be verified."))
+            "no_compute", "No compute component has instance_count and vcpu_per_instance, so capacity cannot be verified.", informational=True))
         return findings
 
     needed = required_vcpu(capacity)

@@ -13,7 +13,7 @@ from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.schemas.advisor import AdvisorPlan
-from app.services.capacity import add_measurement_question, check_capacity
+from app.services.capacity import Finding, add_measurement_question, check_capacity
 from app.services.knowledge_base import RetrievedChunk, retrieve_multi
 from app.services.llm_client import LLMClient, LLMError
 
@@ -46,7 +46,7 @@ How to work:
 - Show how you reached the sizing: state the capacity reasoning (requests per second, CPU per request) in the rationale, and mark every number the customer did not give as an assumption.
 - Capacity: for request driven workloads fill "capacity". peak_rps comes from the customer. cpu_ms_per_request is "customer" only if the customer gave it, otherwise "assumption": estimate it for the kind of application, do not copy the numbers of the catalog examples. Keep target_utilisation between 0.5 and 0.6 and set availability_zones to the number of zones you use.
 - Compute components: set role "compute", instance_count (the minimum, at least one per zone), max_instances (the auto scaling limit) and vcpu_per_instance. The code checks that max_instances x vcpu_per_instance covers peak_rps x cpu_ms_per_request / 1000 / target_utilisation, so do the arithmetic. Give every other component the fitting role.
-- Production defaults: product images and static files in S3 served through CloudFront; a Multi-AZ database with automated backups mentioned in its component; a cache with a replica when availability is required; avoid burstable instance classes for sustained production load.
+- Production defaults: product images and static files in S3 served through CloudFront; a Multi-AZ database with automated backups mentioned in its component; a cache with a replica when availability is required; avoid burstable instance classes for sustained production load; when traffic is spiky or orders and payments must not be lost, put a queue (SQS) in front of slow or critical work so peaks are buffered instead of hitting the database.
 - Facts the customer did not state (traffic pattern, growth, compliance) go to "open_questions". Use "assumptions" only for the working values you need in order to size.
 - Use the customer's region and Availability Zone names (for example eu-central-1a and eu-central-1b) where known.
 - Never invent numbers the customer did not give. Put every assumption in "assumptions" and every missing fact in "open_questions". Mention real risks and trade-offs in "risks".
@@ -77,7 +77,11 @@ class KnowledgeBaseEmpty(AdvisorError):
 class AdvisorResult:
     plan: AdvisorPlan
     sources: List[RetrievedChunk]
-    warnings: List[str] = field(default_factory=list)
+    findings: List[Finding] = field(default_factory=list)
+
+    @property
+    def warnings(self) -> List[str]:
+        return [f.message for f in self.findings]
 
 
 def build_user_prompt(requirements: str, chunks: List[RetrievedChunk]) -> str:
@@ -145,4 +149,4 @@ async def recommend(db: AsyncSession, llm: LLMClient, requirements: str) -> Advi
             logger.warning("Capacity fix answer was invalid, keeping the first plan with warnings")
 
     plan = add_measurement_question(_keep_known_sources(plan, chunks))
-    return AdvisorResult(plan=plan, sources=chunks, warnings=[f.message for f in findings])
+    return AdvisorResult(plan=plan, sources=chunks, findings=findings)

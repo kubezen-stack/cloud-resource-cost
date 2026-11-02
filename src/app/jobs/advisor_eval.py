@@ -28,7 +28,8 @@ async def run(llm, session_factory=async_session, cases=None, runs: int = 1) -> 
                                    "warnings": [str(exc)], "open_questions": 0, "open_questions_ok": False,
                                    "passed": False})
                     continue
-            scored.append(score_plan(case, result.plan.model_dump(), result.warnings))
+            warnings = [f.message for f in result.findings if not f.informational or case.get("require_capacity")]
+            scored.append(score_plan(case, result.plan.model_dump(), warnings))
         summaries.append(summarise_runs(case["name"], scored))
     return summaries
 
