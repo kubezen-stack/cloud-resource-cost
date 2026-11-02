@@ -134,7 +134,10 @@
       "database": [
         "rds",
         "dynamodb",
-        "aurora"
+        "aurora",
+        "documentdb",
+        "postgresql",
+        "mysql"
       ]
     },
     "must_not": [],

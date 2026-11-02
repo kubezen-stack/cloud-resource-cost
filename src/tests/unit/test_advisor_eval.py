@@ -86,3 +86,12 @@ def test_field_names_alone_do_not_satisfy_a_keyword():
     assert score_plan(case, plan)["missing"] == ["backups"]
     plan["components"][0]["sizing"] = "Multi-AZ with automated backups"
     assert score_plan(case, plan)["missing"] == []
+
+
+def test_failed_runs_report_the_services_the_model_proposed():
+    case = {"name": "c", "must_cover": {"database": ["rds"]}}
+    bad = score_plan(case, {"components": [{"aws_service": "Firebase"}, {"aws_service": "Lambda"}], "open_questions": []})
+    good = score_plan(case, {"components": [{"aws_service": "RDS"}], "open_questions": []})
+    summary = summarise_runs("c", [bad, good])
+    assert summary["failed_services"] == [["Firebase", "Lambda"]]
+    assert "services in a failed run: Firebase, Lambda" in format_report([summary])

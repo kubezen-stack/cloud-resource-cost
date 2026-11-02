@@ -67,6 +67,14 @@ class CapacityInputs(BaseModel):
 class AdvisorPlan(BaseModel):
     summary: str
     capacity: Optional[CapacityInputs] = None
+
+    @field_validator("capacity", mode="before")
+    @classmethod
+    def empty_capacity_is_none(cls, value):
+        # "No traffic figures" is often written as an object with null numbers instead of null.
+        if isinstance(value, dict) and (value.get("peak_rps") is None or value.get("cpu_ms_per_request") is None):
+            return None
+        return value
     assumptions: List[str] = Field(default_factory=list)
     components: List[Component] = Field(min_length=1)
     open_questions: List[str] = Field(default_factory=list)

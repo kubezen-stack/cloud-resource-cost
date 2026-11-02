@@ -48,6 +48,7 @@ def score_plan(case: Dict[str, Any], plan: Dict[str, Any], warnings: Optional[Li
         "open_questions": open_questions,
         "open_questions_ok": open_questions >= min_questions,
         "passed": not missing and not forbidden and not warnings and open_questions >= min_questions,
+        "services": [c.get("aws_service", "") for c in plan.get("components", []) if isinstance(c, dict)],
     }
 
 
@@ -63,5 +64,7 @@ def summarise_runs(name: str, runs: List[Dict[str, Any]]) -> Dict[str, Any]:
         "missing": sorted({m for r in runs for m in r["missing"]}),
         "forbidden": sorted({f for r in runs for f in r["forbidden"]}),
         "warnings": sorted({w for r in runs for w in r["warnings"]}),
+        # What the model proposed in the runs that did not pass: shows why a topic counted as missing.
+        "failed_services": [r.get("services", []) for r in runs if not r["passed"] and r.get("services")],
         "open_questions_ok": all(r["open_questions_ok"] for r in runs),
     }

@@ -43,6 +43,8 @@ def format_report(results: list) -> str:
         extra += "" if r["open_questions_ok"] else " too_few_open_questions"
         for warning in r["warnings"]:
             extra += f"\n      ! {warning}"
+        for services in r.get("failed_services", [])[:2]:
+            extra += f"\n      services in a failed run: {', '.join(services)}"
         lines.append(f"{status} {r['name']:<18} coverage={r['coverage']:.0%} runs={r['passes']}/{r['runs']}{extra}")
     average = sum(r["coverage"] for r in results) / len(results) if results else 0.0
     lines.append(f"average coverage: {average:.0%}, passed {sum(r['passed'] for r in results)}/{len(results)} cases")

@@ -276,3 +276,15 @@ async def test_validation_retry_names_the_invalid_field_without_echoing_content(
 
     retry = llm.calls[1][1]
     assert "components.0.instance_count" in retry and "greater_than_equal" in retry
+
+
+@pytest.mark.asyncio
+async def test_capacity_object_with_null_numbers_means_no_capacity(db_session):
+    data = json.loads(plan())
+    data["capacity"] = {"peak_rps": None, "cpu_ms_per_request": None, "availability_zones": 2}
+    llm = FakeLLM([json.dumps(data)])
+    await sync_catalog(db_session, llm)
+
+    result = await recommend(db_session, llm, REQUIREMENTS)
+
+    assert len(llm.calls) == 1 and result.plan.capacity is None
