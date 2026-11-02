@@ -176,6 +176,15 @@ resource "aws_iam_policy" "cost_explorer_policy" {
           "elasticloadbalancing:DescribeListeners"
         ]
         Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "pricing:GetProducts",
+          "pricing:DescribeServices",
+          "pricing:GetAttributeValues"
+        ]
+        Resource = "*"
       }
     ]
   })
