@@ -1,16 +1,17 @@
 import pytest
 
 from app.schemas.advisor import AdvisorPlan, CapacityInputs
-from app.services.capacity import add_measurement_question, check_capacity, required_vcpu
+from app.services.capacity import add_measurement_question, check_capacity, check_data_tier, check_plan, check_security, required_vcpu
 
 
-def make_plan(count=4, max_count=4, vcpu=2, capacity=True, source="assumption", zones=2, questions=None):
+def make_plan(count=4, max_count=6, vcpu=2, capacity=True, source="assumption", zones=2, questions=None, data_gb=None):
     return AdvisorPlan.model_validate({
         "summary": "s",
         "capacity": {"peak_rps": 200, "cpu_ms_per_request": 20, "cpu_ms_source": source,
-                     "target_utilisation": 0.6, "availability_zones": zones} if capacity else None,
+                     "target_utilisation": 0.6, "availability_zones": zones, "data_size_gb": data_gb} if capacity else None,
         "components": [{"name": "app", "aws_service": "EC2", "sizing": "x", "rationale": "r", "role": "compute",
-                        "instance_count": count, "max_instances": max_count, "vcpu_per_instance": vcpu}],
+                        "instance_count": count, "max_instances": max_count, "vcpu_per_instance": vcpu},
+                       {"name": "sec", "aws_service": "VPC", "sizing": "x", "rationale": "r", "role": "security"}],
         "open_questions": questions or [],
     })
 
@@ -24,12 +25,12 @@ def test_required_vcpu_formula():
 
 
 def test_enough_capacity_passes():
-    assert check_capacity(make_plan(count=2, max_count=4, vcpu=2)) == []  # peak 8 vCPU >= 6.67
+    assert check_capacity(make_plan(count=2, max_count=6, vcpu=2)) == []  # peak 12 vCPU >= 6.67, 6 left after a zone loss
 
 
 def test_shortfall_is_blocking():
     findings = check_capacity(make_plan(count=2, max_count=2, vcpu=2))  # 4 vCPU < 6.67
-    assert [f.code for f in findings] == ["shortfall"] and findings[0].blocking
+    assert findings[0].code == "shortfall" and findings[0].blocking
 
 
 def test_autoscaling_maximum_counts_for_peak():
@@ -42,7 +43,7 @@ def test_fewer_instances_than_zones_is_blocking():
 
 
 def test_missing_max_is_only_a_warning():
-    findings = check_capacity(make_plan(count=4, max_count=None, vcpu=2))
+    findings = check_capacity(make_plan(count=4, max_count=None, vcpu=4))
     assert [f.code for f in findings] == ["no_max"] and not findings[0].blocking
 
 
@@ -76,3 +77,51 @@ def test_assumed_cpu_time_adds_open_question_once():
 
 def test_customer_given_cpu_time_adds_nothing():
     assert add_measurement_question(make_plan(source="customer")).open_questions == []
+
+
+def test_zone_loss_is_blocking_when_remaining_capacity_is_too_small():
+    findings = check_capacity(make_plan(count=2, max_count=4, vcpu=2))
+    assert [f.code for f in findings] == ["zone_loss"] and findings[0].blocking
+
+
+def test_zone_loss_not_checked_for_single_zone():
+    assert check_capacity(make_plan(count=1, max_count=4, vcpu=2, zones=1)) == []
+
+
+def data_plan(**database):
+    component = {"name": "db", "aws_service": "RDS", "sizing": "x", "rationale": "r", "role": "database", **database}
+    return AdvisorPlan.model_validate({
+        "summary": "s", "capacity": {"peak_rps": 1, "cpu_ms_per_request": 1, "data_size_gb": 50},
+        "components": [component, {"name": "cache", "aws_service": "ElastiCache", "sizing": "x", "rationale": "r",
+                                   "role": "cache", "instance_class": "cache.t4g.medium"}]})
+
+
+def test_database_without_class_and_storage_is_flagged():
+    findings = check_data_tier(data_plan())
+    assert len(findings) == 2 and all(f.code == "missing_size" and f.blocking for f in findings)
+
+
+def test_cache_without_class_is_flagged():
+    plan = data_plan(instance_class="db.m6g.large", storage_gb=100)
+    plan.components[1].instance_class = None
+    assert [f.code for f in check_data_tier(plan)] == ["missing_size"]
+
+
+def test_storage_must_cover_data_with_headroom():
+    findings = check_data_tier(data_plan(instance_class="db.m6g.large", storage_gb=60))  # 50 * 1.3 = 65
+    assert [f.code for f in findings] == ["small_storage"] and "65" in findings[0].message
+    assert check_data_tier(data_plan(instance_class="db.m6g.large", storage_gb=100)) == []
+
+
+def test_missing_security_is_blocking_only_for_multi_zone_plans():
+    plan = make_plan()
+    plan.components = [c for c in plan.components if c.role != "security"]
+    assert check_security(plan)[0].blocking
+    plan.capacity = None
+    finding = check_security(plan)[0]
+    assert finding.informational and not finding.blocking
+    assert check_security(make_plan()) == []
+
+
+def test_check_plan_combines_all_checks():
+    assert check_plan(make_plan()) == []

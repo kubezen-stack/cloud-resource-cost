@@ -49,6 +49,18 @@
         "backup",
         "snapshot",
         "point-in-time"
+      ],
+      "security": [
+        "waf",
+        "private subnet",
+        "security group",
+        "encrypt",
+        "kms"
+      ],
+      "db_class": [
+        "db.m",
+        "db.r",
+        "db.t"
       ]
     },
     "must_not": [],

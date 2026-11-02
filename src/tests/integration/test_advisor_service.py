@@ -144,12 +144,14 @@ def sized_plan(count, max_count, vcpu=2):
     data["capacity"] = {"peak_rps": 200, "cpu_ms_per_request": 20, "cpu_ms_source": "assumption",
                         "target_utilisation": 0.6, "availability_zones": 2}
     data["components"][0].update(role="compute", instance_count=count, max_instances=max_count, vcpu_per_instance=vcpu)
+    data["components"].append({"name": "Network security", "aws_service": "VPC", "sizing": "private subnets",
+                               "rationale": "isolation", "role": "security"})
     return json.dumps(data)
 
 
 @pytest.mark.asyncio
 async def test_capacity_shortfall_triggers_one_fix_request(db_session):
-    llm = FakeLLM([sized_plan(2, 2), sized_plan(2, 4)])
+    llm = FakeLLM([sized_plan(2, 2), sized_plan(2, 6)])
     await sync_catalog(db_session, llm)
 
     result = await recommend(db_session, llm, REQUIREMENTS)
@@ -157,7 +159,7 @@ async def test_capacity_shortfall_triggers_one_fix_request(db_session):
     assert len(llm.calls) == 2
     assert "Automatic checks" in llm.calls[1][1] and "6.7" in llm.calls[1][1]
     assert result.warnings == []
-    assert result.plan.components[0].max_instances == 4
+    assert result.plan.components[0].max_instances == 6
     assert any("measure" in q for q in result.plan.open_questions)
 
 
@@ -184,7 +186,7 @@ async def test_invalid_fix_answer_keeps_first_plan(db_session):
 
 @pytest.mark.asyncio
 async def test_correct_plan_needs_single_call(db_session):
-    llm = FakeLLM([sized_plan(2, 4)])
+    llm = FakeLLM([sized_plan(2, 6)])
     await sync_catalog(db_session, llm)
 
     result = await recommend(db_session, llm, REQUIREMENTS)
@@ -194,7 +196,7 @@ async def test_correct_plan_needs_single_call(db_session):
 
 @pytest.mark.asyncio
 async def test_missing_capacity_is_informational_not_blocking(db_session):
-    data = json.loads(sized_plan(2, 4))
+    data = json.loads(sized_plan(2, 6))
     data["capacity"] = None
     llm = FakeLLM([json.dumps(data)])
     await sync_catalog(db_session, llm)
@@ -204,3 +206,19 @@ async def test_missing_capacity_is_informational_not_blocking(db_session):
     assert len(llm.calls) == 1
     assert result.findings and all(f.informational for f in result.findings)
     assert "not verified" in result.warnings[0]
+
+
+@pytest.mark.asyncio
+async def test_missing_database_size_is_fixed_by_second_answer(db_session):
+    bad = json.loads(sized_plan(2, 6))
+    bad["components"].append({"name": "DB", "aws_service": "RDS", "sizing": "Multi-AZ", "rationale": "r", "role": "database"})
+    good = json.loads(sized_plan(2, 6))
+    good["components"].append({"name": "DB", "aws_service": "RDS", "sizing": "Multi-AZ", "rationale": "r",
+                               "role": "database", "instance_class": "db.m6g.large", "storage_gb": 100})
+    llm = FakeLLM([json.dumps(bad), json.dumps(good)])
+    await sync_catalog(db_session, llm)
+
+    result = await recommend(db_session, llm, REQUIREMENTS)
+
+    assert len(llm.calls) == 2 and "instance_class" in llm.calls[1][1]
+    assert result.warnings == []

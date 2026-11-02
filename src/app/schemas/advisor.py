@@ -13,11 +13,14 @@ class Component(BaseModel):
     basis: Literal["catalog", "general_knowledge"] = "general_knowledge"
     sources: List[str] = Field(default_factory=list)
     # What the component is for; "compute" components are checked against the capacity inputs.
-    role: Literal["compute", "database", "cache", "network", "storage", "monitoring", "other"] = "other"
+    role: Literal["compute", "database", "cache", "network", "storage", "security", "monitoring", "other"] = "other"
     # Only for instance based compute: minimum and maximum (auto scaling) instance count and size.
     instance_count: Optional[int] = Field(default=None, ge=1, le=1000)
     max_instances: Optional[int] = Field(default=None, ge=1, le=1000)
     vcpu_per_instance: Optional[int] = Field(default=None, ge=1, le=512)
+    # Databases and caches: node/instance class (for example db.m6g.large) and, for databases, storage.
+    instance_class: Optional[str] = Field(default=None, max_length=64)
+    storage_gb: Optional[int] = Field(default=None, ge=1, le=1_000_000)
 
 
 class CapacityInputs(BaseModel):
@@ -27,6 +30,7 @@ class CapacityInputs(BaseModel):
     cpu_ms_source: Literal["customer", "assumption"] = "assumption"
     target_utilisation: float = Field(default=0.6, ge=0.3, le=0.8)
     availability_zones: int = Field(default=2, ge=1, le=6)
+    data_size_gb: Optional[float] = Field(default=None, gt=0, le=1_000_000)
 
 
 class AdvisorPlan(BaseModel):

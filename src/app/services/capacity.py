@@ -14,6 +14,12 @@ class Finding:
     informational: bool = False
 
 
+# After losing one Availability Zone the remaining servers may run hotter than the normal target.
+ZONE_LOSS_UTILISATION = 0.85
+# Database storage needs room to grow beyond the data the customer has today.
+STORAGE_HEADROOM = 1.3
+
+
 def required_vcpu(capacity: CapacityInputs) -> float:
     """vCPU needed at peak so that average utilisation stays at the target."""
     return capacity.peak_rps * capacity.cpu_ms_per_request / 1000.0 / capacity.target_utilisation
@@ -26,11 +32,13 @@ def check_capacity(plan: AdvisorPlan) -> List[Finding]:
 
     if capacity is None:
         if compute:
-            findings.append(Finding("unverified", "Capacity inputs were not given, so the compute sizing is not verified.", informational=True))
+            findings.append(Finding(
+                "unverified", "Capacity inputs were not given, so the compute sizing is not verified.", informational=True))
         return findings
     if not compute:
         findings.append(Finding(
-            "no_compute", "No compute component has instance_count and vcpu_per_instance, so capacity cannot be verified.", informational=True))
+            "no_compute", "No compute component has instance_count and vcpu_per_instance, so capacity cannot be verified.",
+            informational=True))
         return findings
 
     needed = required_vcpu(capacity)
@@ -43,6 +51,19 @@ def check_capacity(plan: AdvisorPlan) -> List[Finding]:
             f"{capacity.target_utilisation:.0%} target utilisation.",
             blocking=True,
         ))
+
+    zones = capacity.availability_zones
+    if zones >= 2:
+        needed_after_loss = capacity.peak_rps * capacity.cpu_ms_per_request / 1000.0 / ZONE_LOSS_UTILISATION
+        remaining = provisioned * (zones - 1) / zones
+        if remaining < needed_after_loss:
+            findings.append(Finding(
+                "zone_loss",
+                f"If one of {zones} Availability Zones fails at peak, about {remaining:.1f} vCPU remain but "
+                f"{math.ceil(needed_after_loss * 10) / 10:g} vCPU are needed: raise max_instances or vcpu_per_instance "
+                "so that high availability holds at peak load.",
+                blocking=True,
+            ))
 
     for component in compute:
         if component.instance_count < capacity.availability_zones:
@@ -58,6 +79,44 @@ def check_capacity(plan: AdvisorPlan) -> List[Finding]:
             findings.append(Finding(
                 "bad_max", f"'{component.name}' has max_instances below instance_count.", blocking=True))
     return findings
+
+
+def check_data_tier(plan: AdvisorPlan) -> List[Finding]:
+    """Databases and caches need a concrete class, databases also storage that fits the data."""
+    findings: List[Finding] = []
+    for component in plan.components:
+        if component.role in ("database", "cache") and not component.instance_class:
+            findings.append(Finding(
+                "missing_size", f"'{component.name}' has no instance_class (for example db.m6g.large).", blocking=True))
+        if component.role == "database":
+            if not component.storage_gb:
+                findings.append(Finding("missing_size", f"'{component.name}' has no storage_gb.", blocking=True))
+            elif plan.capacity and plan.capacity.data_size_gb:
+                needed = plan.capacity.data_size_gb * STORAGE_HEADROOM
+                if component.storage_gb < needed:
+                    findings.append(Finding(
+                        "small_storage",
+                        f"'{component.name}' has {component.storage_gb} GB storage but the stated data of "
+                        f"{plan.capacity.data_size_gb:g} GB needs at least {math.ceil(needed)} GB with growth headroom.",
+                        blocking=True,
+                    ))
+    return findings
+
+
+def check_security(plan: AdvisorPlan) -> List[Finding]:
+    if any(c.role == "security" for c in plan.components):
+        return []
+    highly_available = bool(plan.capacity and plan.capacity.availability_zones >= 2)
+    return [Finding(
+        "no_security",
+        "No security component (private subnets, security groups, encryption, WAF) is part of the plan.",
+        blocking=highly_available,
+        informational=not highly_available,
+    )]
+
+
+def check_plan(plan: AdvisorPlan) -> List[Finding]:
+    return check_capacity(plan) + check_data_tier(plan) + check_security(plan)
 
 
 def add_measurement_question(plan: AdvisorPlan) -> AdvisorPlan:
