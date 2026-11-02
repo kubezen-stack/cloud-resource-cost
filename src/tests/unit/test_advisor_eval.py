@@ -78,3 +78,11 @@ def test_summarise_runs_reports_stability():
     assert summary["passes"] == 2 and summary["runs"] == 3 and not summary["passed"]
     assert set(summary["missing"]) == {"db", "lb"}
     assert "FAIL" in format_report([summary]) and "runs=2/3" in format_report([summary])
+
+
+def test_field_names_alone_do_not_satisfy_a_keyword():
+    case = {"name": "c", "must_cover": {"backups": ["backup"]}}
+    plan = {"components": [{"backup_retention_days": None, "sizing": "Multi-AZ"}], "open_questions": []}
+    assert score_plan(case, plan)["missing"] == ["backups"]
+    plan["components"][0]["sizing"] = "Multi-AZ with automated backups"
+    assert score_plan(case, plan)["missing"] == []

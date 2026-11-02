@@ -1,6 +1,16 @@
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+
+ROLES = ("compute", "database", "cache", "network", "storage", "security", "monitoring", "other")
+ROLE_SYNONYMS = {
+    "db": "database", "data": "database", "rds": "database", "datastore": "database",
+    "server": "compute", "servers": "compute", "ec2": "compute", "application": "compute",
+    "caching": "cache", "networking": "network", "cdn": "network", "load_balancer": "network",
+    "load balancer": "network", "dns": "network", "logs": "monitoring", "logging": "monitoring",
+    "observability": "monitoring", "iam": "security", "queue": "other", "messaging": "other",
+}
 
 
 class Component(BaseModel):
@@ -23,6 +33,17 @@ class Component(BaseModel):
     storage_gb: Optional[int] = Field(default=None, ge=1, le=1_000_000)
     multi_az: Optional[bool] = None
     replicas: Optional[int] = Field(default=None, ge=0, le=5)
+    backup_retention_days: Optional[int] = Field(default=None, ge=1, le=35)  # databases: automated backups
+
+    @field_validator("role", mode="before")
+    @classmethod
+    def normalise_role(cls, value):
+        if isinstance(value, str):
+            key = value.strip().lower()
+            if key in ROLES:
+                return key
+            return ROLE_SYNONYMS.get(key, "other")
+        return value
 
 
 class CapacityInputs(BaseModel):
@@ -35,6 +56,12 @@ class CapacityInputs(BaseModel):
     target_utilisation: float = Field(default=0.6, ge=0.3, le=0.8)
     availability_zones: int = Field(default=2, ge=1, le=6)
     data_size_gb: Optional[float] = Field(default=None, gt=0, le=1_000_000)
+
+    @field_validator("peak_rps_source", "cpu_ms_source", mode="before")
+    @classmethod
+    def unknown_source_is_an_assumption(cls, value):
+        # Only an explicit "customer" counts as stated by the customer ("derived", "estimated", ... do not).
+        return "customer" if isinstance(value, str) and value.strip().lower() == "customer" else "assumption"
 
 
 class AdvisorPlan(BaseModel):

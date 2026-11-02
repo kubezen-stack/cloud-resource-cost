@@ -10,11 +10,6 @@
         "fargate",
         "lambda"
       ],
-      "autoscaling": [
-        "auto scaling",
-        "autoscaling",
-        "scaling"
-      ],
       "load_balancer": [
         "load balancer",
         "alb"
@@ -44,11 +39,6 @@
       ],
       "object_storage": [
         "s3"
-      ],
-      "backups": [
-        "backup",
-        "snapshot",
-        "point-in-time"
       ],
       "security": [
         "waf",

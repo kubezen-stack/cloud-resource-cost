@@ -47,8 +47,8 @@ How to work:
 - For a production architecture cover each of these areas that applies, or say why it does not: compute and auto scaling, load balancing, database with its storage and backups, caching, static content and CDN, network and security (private subnets, security groups, encryption), monitoring.
 - Show how you reached the sizing: state the capacity reasoning (requests per second, CPU per request) in the rationale, and mark every number the customer did not give as an assumption.
 - Capacity: for request driven workloads fill "capacity". peak_rps_source is "customer" when the requirements state the traffic or it follows directly from them (for example visitors per day), otherwise "assumption". If the customer gave no traffic figures and none can be derived, set capacity to null, propose a small starting setup and ask for the traffic in open_questions: never invent a peak. cpu_ms_per_request is "customer" only if the customer gave it, otherwise "assumption": estimate it for the kind of application, do not copy the numbers of the catalog examples. Keep target_utilisation between 0.5 and 0.6 and set availability_zones to the number of zones you use.
-- Compute components: set role "compute", instance_count (the minimum, at least one per zone), max_instances (the auto scaling limit) and vcpu_per_instance. The code checks that max_instances x vcpu_per_instance covers peak_rps x cpu_ms_per_request / 1000 / target_utilisation, so do the arithmetic. Give every other component the fitting role.
-- Compute components also need instance_class, the exact EC2 type (for example m6i.large), consistent with vcpu_per_instance. Databases need multi_az (true or false) and caches need replicas (0 for a single node): the monthly cost is calculated from these fields, so they must match the text.
+- Compute components: set role "compute", instance_count (the minimum, at least one per zone), max_instances (the auto scaling limit) and vcpu_per_instance. The code checks that max_instances x vcpu_per_instance covers peak_rps x cpu_ms_per_request / 1000 / target_utilisation, so do the arithmetic. Give every other component the fitting role, one of exactly: compute, database, cache, network, storage, security, monitoring, other. Queues, messaging and anything else use "other".
+- Compute components also need instance_class, the exact EC2 type (for example m6i.large), consistent with vcpu_per_instance. Databases need multi_az (true or false) and backup_retention_days (automated backups, 1 to 35, usually 7), and caches need replicas (0 for a single node, at least 1 when the plan spans several zones): the monthly cost is calculated from these fields, so they must match the text.
 - Databases and caches: set instance_class (for example db.m6g.large, cache.t4g.medium) and, for databases, storage_gb with room to grow (at least 30 percent above the data the customer stated; put that figure in capacity.data_size_gb). Do not leave sizes out.
 - High availability: with two or more zones, the servers left after losing one zone must still carry the peak at no more than 85 percent utilisation, so max_instances x vcpu_per_instance must be about twice what one zone needs.
 - Production plans need a component with role "security": private subnets for servers and database, security groups that only allow the load balancer to reach the servers, encryption at rest and in transit, and WAF for public sites.
@@ -64,7 +64,7 @@ Answer with one JSON object and nothing else, with this shape:
   "summary": string,
   "capacity": {"peak_rps": number, "peak_rps_source": "customer" | "assumption", "cpu_ms_per_request": number, "cpu_ms_source": "customer" | "assumption", "target_utilisation": number, "availability_zones": integer, "data_size_gb": number or null} or null,
   "assumptions": [string],
-  "components": [{"name": string, "aws_service": string, "sizing": string, "rationale": string, "basis": "catalog" | "general_knowledge", "sources": [string], "role": "compute" | "database" | "cache" | "network" | "storage" | "security" | "monitoring" | "other", "instance_count": integer or null, "max_instances": integer or null, "vcpu_per_instance": integer or null, "instance_class": string or null, "storage_gb": integer or null, "multi_az": boolean or null, "replicas": integer or null}],
+  "components": [{"name": string, "aws_service": string, "sizing": string, "rationale": string, "basis": "catalog" | "general_knowledge", "sources": [string], "role": "compute" | "database" | "cache" | "network" | "storage" | "security" | "monitoring" | "other", "instance_count": integer or null, "max_instances": integer or null, "vcpu_per_instance": integer or null, "instance_class": string or null, "storage_gb": integer or null, "multi_az": boolean or null, "replicas": integer or null, "backup_retention_days": integer or null}],
   "open_questions": [string],
   "risks": [string]
 }
@@ -99,6 +99,14 @@ def _parse_plan(raw: str) -> AdvisorPlan:
     return AdvisorPlan.model_validate(json.loads(raw))
 
 
+def _describe_error(error: Exception) -> str:
+    """Where and why the answer was invalid, without echoing any of its content."""
+    if isinstance(error, ValidationError):
+        details = [f"{'.'.join(str(p) for p in e['loc'])}: {e['type']}" for e in error.errors()[:5]]
+        return "; ".join(details)
+    return type(error).__name__
+
+
 def _keep_known_sources(plan: AdvisorPlan, chunks: List[RetrievedChunk]) -> AdvisorPlan:
     known = {c.reference for c in chunks}
     for component in plan.components:
@@ -114,15 +122,17 @@ async def _generate(llm: LLMClient, user_prompt: str) -> AdvisorPlan:
     try:
         return _parse_plan(raw)
     except (ValueError, ValidationError) as first_error:
-        logger.warning("Advisor answer failed validation, retrying once: %s", type(first_error).__name__)
+        reason = _describe_error(first_error)
+        logger.warning("Advisor answer failed validation, retrying once: %s", reason)
         retry_prompt = (
-            f"{user_prompt}\n\nYour previous answer was not valid for the required JSON shape "
-            f"({type(first_error).__name__}). Answer again with only the JSON object."
+            f"{user_prompt}\n\nYour previous answer was not valid for the required JSON shape ({reason}). "
+            "Answer again with only the JSON object."
         )
         raw = await llm.complete_json(SYSTEM_PROMPT, retry_prompt)
         try:
             return _parse_plan(raw)
         except (ValueError, ValidationError) as e:
+            logger.warning("Advisor retry also invalid: %s", _describe_error(e))
             raise AdvisorError("The model did not return a valid recommendation") from e
 
 

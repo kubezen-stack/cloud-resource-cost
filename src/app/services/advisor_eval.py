@@ -10,8 +10,18 @@ def load_cases(path: Path = EVAL_CASES_PATH) -> List[Dict[str, Any]]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def _values(node: Any) -> List[str]:
+    """All text values of a plan. Field names are skipped so that a name like backup_retention_days
+    cannot satisfy a keyword check by itself."""
+    if isinstance(node, dict):
+        return [text for value in node.values() for text in _values(value)]
+    if isinstance(node, list):
+        return [text for value in node for text in _values(value)]
+    return [node] if isinstance(node, str) else []
+
+
 def plan_text(plan: Dict[str, Any]) -> str:
-    return json.dumps(plan, ensure_ascii=False).lower()
+    return " ".join(_values(plan)).lower()
 
 
 def score_plan(case: Dict[str, Any], plan: Dict[str, Any], warnings: Optional[List[str]] = None) -> Dict[str, Any]:

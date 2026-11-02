@@ -100,9 +100,20 @@ def check_data_tier(plan: AdvisorPlan) -> List[Finding]:
                 "missing_size", f"'{component.name}' has no instance_class (for example m6i.large).", blocking=True))
         if component.role == "database" and component.multi_az is None:
             findings.append(Finding("missing_size", f"'{component.name}' has no multi_az value.", blocking=True))
+        if component.role == "database" and component.backup_retention_days is None:
+            findings.append(Finding(
+                "no_backups", f"'{component.name}' has no backup_retention_days (automated backups, 1 to 35).",
+                blocking=True))
         if component.role == "cache" and component.replicas is None:
             findings.append(Finding(
                 "missing_size", f"'{component.name}' has no replicas value (0 for a single node).", blocking=True))
+        elif (component.role == "cache" and component.replicas == 0
+              and plan.capacity and plan.capacity.availability_zones >= 2):
+            findings.append(Finding(
+                "cache_not_ha",
+                f"'{component.name}' is a single node but the plan spans {plan.capacity.availability_zones} zones: "
+                "add at least one replica.",
+                blocking=True))
         if component.role in ("database", "cache") and not component.instance_class:
             findings.append(Finding(
                 "missing_size", f"'{component.name}' has no instance_class (for example db.m6g.large).", blocking=True))

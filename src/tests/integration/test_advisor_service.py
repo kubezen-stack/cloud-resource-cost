@@ -215,7 +215,7 @@ async def test_missing_database_size_is_fixed_by_second_answer(db_session):
     good = json.loads(sized_plan(2, 6))
     good["components"].append({"name": "DB", "aws_service": "RDS", "sizing": "Multi-AZ", "rationale": "r",
                                "role": "database", "instance_class": "db.m6g.large", "storage_gb": 100,
-                               "multi_az": True})
+                               "multi_az": True, "backup_retention_days": 7})
     llm = FakeLLM([json.dumps(bad), json.dumps(good)])
     await sync_catalog(db_session, llm)
 
@@ -246,3 +246,33 @@ async def test_fix_attempts_are_limited(db_session):
 
     assert len(llm.calls) == 3
     assert result.warnings
+
+
+@pytest.mark.asyncio
+async def test_unknown_role_and_source_values_do_not_break_the_answer(db_session):
+    data = json.loads(sized_plan(2, 6))
+    data["capacity"]["peak_rps_source"] = "derived"
+    data["components"].append({"name": "Orders queue", "aws_service": "SQS", "sizing": "standard",
+                               "rationale": "buffer", "role": "messaging"})
+    llm = FakeLLM([json.dumps(data)])
+    await sync_catalog(db_session, llm)
+
+    result = await recommend(db_session, llm, REQUIREMENTS)
+
+    assert len(llm.calls) == 1  # no validation retry
+    assert result.plan.components[-1].role == "other"
+    assert result.plan.capacity.peak_rps_source == "assumption"
+    assert any("peak traffic" in q for q in result.plan.open_questions)
+
+
+@pytest.mark.asyncio
+async def test_validation_retry_names_the_invalid_field_without_echoing_content(db_session):
+    bad = json.loads(sized_plan(2, 6))
+    bad["components"][0]["instance_count"] = 0  # below the minimum
+    llm = FakeLLM([json.dumps(bad), sized_plan(2, 6)])
+    await sync_catalog(db_session, llm)
+
+    await recommend(db_session, llm, REQUIREMENTS)
+
+    retry = llm.calls[1][1]
+    assert "components.0.instance_count" in retry and "greater_than_equal" in retry

@@ -88,11 +88,11 @@ def test_zone_loss_not_checked_for_single_zone():
     assert check_capacity(make_plan(count=1, max_count=4, vcpu=2, zones=1)) == []
 
 
-def data_plan(**database):
+def data_plan(zones=2, **database):
     component = {"name": "db", "aws_service": "RDS", "sizing": "x", "rationale": "r", "role": "database",
-                 "multi_az": True, **database}
+                 "multi_az": True, "backup_retention_days": 7, **database}
     return AdvisorPlan.model_validate({
-        "summary": "s", "capacity": {"peak_rps": 1, "cpu_ms_per_request": 1, "data_size_gb": 50},
+        "summary": "s", "capacity": {"peak_rps": 1, "cpu_ms_per_request": 1, "data_size_gb": 50, "availability_zones": zones},
         "components": [component, {"name": "cache", "aws_service": "ElastiCache", "sizing": "x", "rationale": "r",
                                    "role": "cache", "instance_class": "cache.t4g.medium", "replicas": 1}]})
 
@@ -156,3 +156,19 @@ def test_database_needs_multi_az_and_cache_needs_replicas():
     plan.components[1].replicas = None
     messages = [f.message for f in check_data_tier(plan)]
     assert any("multi_az" in m for m in messages) and any("replicas" in m for m in messages)
+
+
+def test_database_needs_backup_retention():
+    plan = data_plan(instance_class="db.m6g.large", storage_gb=100)
+    plan.components[0].backup_retention_days = None
+    findings = check_data_tier(plan)
+    assert [f.code for f in findings] == ["no_backups"] and findings[0].blocking
+
+
+def test_single_cache_node_is_not_highly_available():
+    plan = data_plan(instance_class="db.m6g.large", storage_gb=100)
+    plan.components[1].replicas = 0
+    assert [f.code for f in check_data_tier(plan)] == ["cache_not_ha"]
+    single_zone = data_plan(zones=1, instance_class="db.m6g.large", storage_gb=100)
+    single_zone.components[1].replicas = 0
+    assert check_data_tier(single_zone) == []
