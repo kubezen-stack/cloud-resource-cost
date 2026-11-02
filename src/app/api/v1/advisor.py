@@ -11,8 +11,11 @@ from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.models.user import User
 from app.schemas.advisor import AdvisorRequest, AdvisorResponse, SourceRef
+from app.schemas.cost import CostEstimate, CostRequest
 from app.services.advisor_service import AdvisorError, KnowledgeBaseEmpty, recommend
+from app.services.cost_estimator import estimate_cost
 from app.services.llm_client import LLMClient, LLMError, LLMNotConfigured, get_llm_client
+from app.services.pricing import PriceSource, PricingError, PricingUnavailable, UnsupportedRegion, get_price_source
 
 logger = logging.getLogger(__name__)
 
@@ -85,3 +88,25 @@ async def recommend_architecture(
         model=llm.model,
         warnings=result.warnings,
     )
+
+
+@router.post("/cost", response_model=CostEstimate)
+async def estimate_plan_cost(
+    body: CostRequest,
+    current_user: Annotated[User, Depends(get_current_user)],
+    prices: Annotated[PriceSource, Depends(get_price_source)],
+):
+    """Monthly list-price cost of an advisor plan, with usage-based items and cheaper alternatives."""
+    try:
+        return await estimate_cost(body.plan, body.region, prices)
+    except UnsupportedRegion as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    except PricingUnavailable:
+        logger.exception("AWS Price List is unavailable")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="AWS Price List is unavailable, try again",
+        )
+    except PricingError:
+        logger.exception("Cost estimate failed")
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="The cost estimate could not be calculated")

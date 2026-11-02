@@ -1,0 +1,6 @@
+{
+    "FormatVersion": "aws_v1",
+    "PriceList": [
+        "{\"product\":{\"productFamily\":\"NAT Gateway\",\"attributes\":{\"regionCode\":\"eu-central-1\",\"servicecode\":\"AmazonEC2\",\"groupDescription\":\"Hourly charge for NAT Gateways\",\"usagetype\":\"EUC1-NatGateway-Hours\",\"locationType\":\"AWS Region\",\"location\":\"EU (Frankfurt)\",\"servicename\":\"Amazon Elastic Compute Cloud\",\"operation\":\"NatGateway\",\"group\":\"NGW:NatGateway\"},\"sku\":\"FY5BA3Q38RMNEMJS\"},\"serviceCode\":\"AmazonEC2\",\"terms\":{\"OnDemand\":{\"FY5BA3Q38RMNEMJS.JRTCKXETXF\":{\"priceDimensions\":{\"FY5BA3Q38RMNEMJS.JRTCKXETXF.6YS6EN2CT7\":{\"unit\":\"Hrs\",\"endRange\":\"Inf\",\"description\":\"$0.052 per NAT Gateway Hour\",\"appliesTo\":[],\"rateCode\":\"FY5BA3Q38RMNEMJS.JRTCKXETXF.6YS6EN2CT7\",\"beginRange\":\"0\",\"pricePerUnit\":{\"USD\":\"0.0520000000\"}}},\"sku\":\"FY5BA3Q38RMNEMJS\",\"effectiveDate\":\"2026-10-01T00:00:00Z\",\"offerTermCode\":\"JRTCKXETXF\",\"termAttributes\":{}}}},\"version\":\"20261029175634\",\"publicationDate\":\"2026-10-29T17:56:34Z\"}"
+    ]
+}
