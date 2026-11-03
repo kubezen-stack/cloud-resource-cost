@@ -28,8 +28,10 @@ async def run(llm, session_factory=async_session, cases=None, runs: int = 1) -> 
                                    "warnings": [str(exc)], "open_questions": 0, "open_questions_ok": False,
                                    "passed": False})
                     continue
-            warnings = [f.message for f in result.findings if not f.informational or case.get("require_capacity")]
-            scored.append(score_plan(case, result.plan.model_dump(), warnings))
+            warnings = [f.message for f in result.findings
+                        if f.code != "sized" and (not f.informational or case.get("require_capacity"))]
+            adjusted = any(f.code == "sized" for f in result.findings)
+            scored.append(score_plan(case, result.plan.model_dump(), warnings, adjusted))
         summaries.append(summarise_runs(case["name"], scored))
     return summaries
 
@@ -45,6 +47,8 @@ def format_report(results: list) -> str:
             extra += f"\n      ! {warning}"
         for services in r.get("failed_services", [])[:2]:
             extra += f"\n      services in a failed run: {', '.join(services)}"
+        if r.get("adjusted_runs"):
+            extra = f" code_sized={r['adjusted_runs']}/{r['runs']}" + extra
         lines.append(f"{status} {r['name']:<18} coverage={r['coverage']:.0%} runs={r['passes']}/{r['runs']}{extra}")
     average = sum(r["coverage"] for r in results) / len(results) if results else 0.0
     lines.append(f"average coverage: {average:.0%}, passed {sum(r['passed'] for r in results)}/{len(results)} cases")

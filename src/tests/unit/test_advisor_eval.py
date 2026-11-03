@@ -95,3 +95,10 @@ def test_failed_runs_report_the_services_the_model_proposed():
     summary = summarise_runs("c", [bad, good])
     assert summary["failed_services"] == [["Firebase", "Lambda"]]
     assert "services in a failed run: Firebase, Lambda" in format_report([summary])
+
+
+def test_code_adjusted_runs_are_reported():
+    good = score_plan(CASE, {"components": [{"aws_service": "RDS ALB"}], "open_questions": ["q"]}, adjusted=True)
+    summary = summarise_runs("c", [good, good, score_plan(CASE, {"components": [{"aws_service": "RDS ALB"}], "open_questions": ["q"]})])
+    assert summary["adjusted_runs"] == 2 and summary["passed"]
+    assert "code_sized=2/3" in format_report([summary])

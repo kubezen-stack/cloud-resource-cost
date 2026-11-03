@@ -150,38 +150,54 @@ def sized_plan(count, max_count, vcpu=2):
 
 
 @pytest.mark.asyncio
-async def test_capacity_shortfall_triggers_one_fix_request(db_session):
-    llm = FakeLLM([sized_plan(2, 2), sized_plan(2, 6)])
+async def test_capacity_shortfall_is_sized_by_code_without_an_extra_llm_call(db_session):
+    llm = FakeLLM([sized_plan(2, 2)])
     await sync_catalog(db_session, llm)
 
     result = await recommend(db_session, llm, REQUIREMENTS)
 
-    assert len(llm.calls) == 2
-    assert "Automatic checks" in llm.calls[1][1] and "6.7" in llm.calls[1][1]
-    assert result.warnings == []
-    assert result.plan.components[0].max_instances == 6
+    assert len(llm.calls) == 1
+    server = result.plan.components[0]
+    assert (server.instance_count, server.max_instances) == (2, 6)  # ceil(9.41 / 2) = 5 -> 6 for two zones
+    assert server.sizing == "2-6 x m6i.large (2 vCPU each), auto scaling across 2 Availability Zones"
+    assert [f.code for f in result.findings] == ["sized"] and "proposed 2-2" in result.warnings[0]
     assert any("measure" in q for q in result.plan.open_questions)
 
 
 @pytest.mark.asyncio
-async def test_unfixed_shortfall_is_kept_with_warning(db_session):
-    llm = FakeLLM([sized_plan(2, 2)] * 3)
+async def test_two_compute_tiers_are_checked_and_the_model_is_asked_to_fix_them(db_session):
+    def two_tiers(max_count):
+        data = json.loads(sized_plan(2, max_count))
+        data["components"].append({"name": "Workers", "aws_service": "EC2", "sizing": "x", "rationale": "r",
+                                   "role": "compute", "instance_class": "m6i.large", "instance_count": 2,
+                                   "max_instances": max_count, "vcpu_per_instance": 2})
+        return json.dumps(data)
+
+    llm = FakeLLM([two_tiers(2), two_tiers(6)])
     await sync_catalog(db_session, llm)
 
     result = await recommend(db_session, llm, REQUIREMENTS)
 
-    assert len(llm.calls) == 3
-    assert result.warnings and "vCPU" in result.warnings[0]
+    assert len(llm.calls) == 2 and "at least 10" in llm.calls[1][1]  # ceil(9.41)
+    assert result.findings == []  # 2 x (6 x 2) vCPU
 
 
 @pytest.mark.asyncio
-async def test_invalid_fix_answer_keeps_first_plan(db_session):
-    llm = FakeLLM([sized_plan(2, 2), "not json"])
+async def test_unfixed_two_tier_plan_keeps_its_warnings_after_one_fix_request(db_session):
+    def two_tiers():
+        data = json.loads(sized_plan(2, 2))
+        data["components"].append({"name": "Workers", "aws_service": "EC2", "sizing": "x", "rationale": "r",
+                                   "role": "compute", "instance_class": "m6i.large", "instance_count": 2,
+                                   "max_instances": 2, "vcpu_per_instance": 2})
+        return json.dumps(data)
+
+    llm = FakeLLM([two_tiers()] * 4)
     await sync_catalog(db_session, llm)
 
     result = await recommend(db_session, llm, REQUIREMENTS)
 
-    assert result.warnings and result.plan.components[0].max_instances == 2
+    assert len(llm.calls) == 2  # never more than one fix request
+    assert any(f.blocking for f in result.findings) and any("vCPU" in w for w in result.warnings)
 
 
 @pytest.mark.asyncio
@@ -223,29 +239,6 @@ async def test_missing_database_size_is_fixed_by_second_answer(db_session):
 
     assert len(llm.calls) == 2 and "instance_class" in llm.calls[1][1]
     assert result.warnings == []
-
-
-@pytest.mark.asyncio
-async def test_second_fix_attempt_gets_exact_minimum_in_feedback(db_session):
-    llm = FakeLLM([sized_plan(2, 2), sized_plan(2, 4), sized_plan(2, 6)])
-    await sync_catalog(db_session, llm)
-
-    result = await recommend(db_session, llm, REQUIREMENTS)
-
-    assert len(llm.calls) == 3
-    assert "at least 10" in llm.calls[1][1]  # ceil(9.41)
-    assert result.warnings == [] and result.plan.components[0].max_instances == 6
-
-
-@pytest.mark.asyncio
-async def test_fix_attempts_are_limited(db_session):
-    llm = FakeLLM([sized_plan(2, 2)] * 3 + [sized_plan(2, 2)] * 3)
-    await sync_catalog(db_session, llm)
-
-    result = await recommend(db_session, llm, REQUIREMENTS)
-
-    assert len(llm.calls) == 3
-    assert result.warnings
 
 
 @pytest.mark.asyncio

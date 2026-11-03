@@ -24,7 +24,8 @@ def plan_text(plan: Dict[str, Any]) -> str:
     return " ".join(_values(plan)).lower()
 
 
-def score_plan(case: Dict[str, Any], plan: Dict[str, Any], warnings: Optional[List[str]] = None) -> Dict[str, Any]:
+def score_plan(case: Dict[str, Any], plan: Dict[str, Any], warnings: Optional[List[str]] = None,
+               adjusted: bool = False) -> Dict[str, Any]:
     """Return which topics the plan covers, forbidden terms and the result of the automatic checks."""
     text = plan_text(plan)
     covered = {
@@ -48,6 +49,7 @@ def score_plan(case: Dict[str, Any], plan: Dict[str, Any], warnings: Optional[Li
         "open_questions": open_questions,
         "open_questions_ok": open_questions >= min_questions,
         "passed": not missing and not forbidden and not warnings and open_questions >= min_questions,
+        "adjusted": adjusted,
         "services": [c.get("aws_service", "") for c in plan.get("components", []) if isinstance(c, dict)],
     }
 
@@ -63,6 +65,7 @@ def summarise_runs(name: str, runs: List[Dict[str, Any]]) -> Dict[str, Any]:
         "coverage": sum(r["coverage"] for r in runs) / len(runs) if runs else 0.0,
         "missing": sorted({m for r in runs for m in r["missing"]}),
         "forbidden": sorted({f for r in runs for f in r["forbidden"]}),
+        "adjusted_runs": sum(bool(r.get("adjusted")) for r in runs),
         "warnings": sorted({w for r in runs for w in r["warnings"]}),
         # What the model proposed in the runs that did not pass: shows why a topic counted as missing.
         "failed_services": [r.get("services", []) for r in runs if not r["passed"] and r.get("services")],

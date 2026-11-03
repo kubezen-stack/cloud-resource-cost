@@ -14,7 +14,7 @@ from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.schemas.advisor import AdvisorPlan
-from app.services.capacity import Finding, add_measurement_question, check_plan, required_peak_vcpu
+from app.services.capacity import Finding, add_measurement_question, check_plan, required_peak_vcpu, size_compute
 from app.services.knowledge_base import RetrievedChunk, retrieve_multi
 from app.services.llm_client import LLMClient, LLMError
 
@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 PER_TOPIC = 3
 MAX_CHUNKS = 14
-MAX_FIX_ATTEMPTS = 2
+MAX_FIX_ATTEMPTS = 1
 
 TOPIC_PROBES = [
     "compute instances sizing web application servers auto scaling",
@@ -48,10 +48,10 @@ How to work:
 - Show how you reached the sizing: state the capacity reasoning (requests per second, CPU per request) in the rationale, and mark every number the customer did not give as an assumption.
 - Almost every application stores data. Always include a data store component (a managed database, or DynamoDB for simple key-value data) unless the customer says the application keeps no data. When the customer did not describe the data, propose a small managed database as a starting point and ask about data volume and access patterns in "open_questions".
 - Capacity: for request driven workloads fill "capacity". peak_rps_source is "customer" when the requirements state the traffic or it follows directly from them (for example visitors per day), otherwise "assumption". If the customer gave no traffic figures and none can be derived, set capacity to null, propose a small starting setup and ask for the traffic in open_questions: never invent a peak. cpu_ms_per_request is "customer" only if the customer gave it, otherwise "assumption": estimate it for the kind of application, do not copy the numbers of the catalog examples. Keep target_utilisation between 0.5 and 0.6 and set availability_zones to the number of zones you use.
-- Compute components: set role "compute", instance_count (the minimum, at least one per zone), max_instances (the auto scaling limit) and vcpu_per_instance. The code checks that max_instances x vcpu_per_instance covers peak_rps x cpu_ms_per_request / 1000 / target_utilisation, so do the arithmetic. Give every other component the fitting role, one of exactly: compute, database, cache, network, storage, security, monitoring, other. Queues, messaging and anything else use "other".
-- Compute components also need instance_class, the exact EC2 type (for example m6i.large), consistent with vcpu_per_instance. Databases need multi_az (true or false) and backup_retention_days (automated backups, 1 to 35, usually 7), and caches need replicas (0 for a single node, at least 1 when the plan spans several zones): the monthly cost is calculated from these fields, so they must match the text.
+- Compute components: set role "compute", instance_class (the exact EC2 type, for example m6i.large) and the matching vcpu_per_instance. Do not do the capacity arithmetic and do not write instance counts in any text: the code sets instance_count and max_instances from the capacity inputs. Give every other component the fitting role, one of exactly: compute, database, cache, network, storage, security, monitoring, other. Queues, messaging and anything else use "other".
+- Databases need multi_az (true or false) and backup_retention_days (automated backups, 1 to 35, usually 7), and caches need replicas (0 for a single node, at least 1 when the plan spans several zones): the monthly cost is calculated from these fields, so they must match the text.
 - Databases and caches: set instance_class (for example db.m6g.large, cache.t4g.medium) and, for databases, storage_gb with room to grow (at least 30 percent above the data the customer stated; put that figure in capacity.data_size_gb). Do not leave sizes out.
-- High availability: with two or more zones, the servers left after losing one zone must still carry the peak at no more than 85 percent utilisation, so max_instances x vcpu_per_instance must be about twice what one zone needs.
+- High availability: with two or more zones the code makes sure that the servers left after losing one zone still carry the peak at no more than 85 percent utilisation. You only choose the instance type.
 - Production plans need a component with role "security": private subnets for servers and database, security groups that only allow the load balancer to reach the servers, encryption at rest and in transit, and WAF for public sites.
 - Production defaults: product images and static files in S3 served through CloudFront; a Multi-AZ database with automated backups mentioned in its component; a cache with a replica when availability is required; avoid burstable instance classes for sustained production load; when traffic is spiky or orders and payments must not be lost, put a queue (SQS) in front of slow or critical work so peaks are buffered instead of hitting the database.
 - Facts the customer did not state (traffic pattern, growth, compliance) go to "open_questions". Use "assumptions" only for the working values you need in order to size.
@@ -137,6 +137,12 @@ async def _generate(llm: LLMClient, user_prompt: str) -> AdvisorPlan:
             raise AdvisorError("The model did not return a valid recommendation") from e
 
 
+def _assess(plan: AdvisorPlan) -> List[Finding]:
+    """Let the code size the compute tier, then check the whole plan."""
+    sized = size_compute(plan)
+    return check_plan(plan) + sized
+
+
 async def recommend(db: AsyncSession, llm: LLMClient, requirements: str) -> AdvisorResult:
     queries = [requirements] + [f"{probe}. Customer needs: {requirements}" for probe in TOPIC_PROBES]
     chunks = await retrieve_multi(db, llm, queries, per_query=PER_TOPIC, limit=MAX_CHUNKS)
@@ -146,7 +152,7 @@ async def recommend(db: AsyncSession, llm: LLMClient, requirements: str) -> Advi
     user_prompt = build_user_prompt(requirements, chunks)
     plan = await _generate(llm, user_prompt)
 
-    findings = check_plan(plan)
+    findings = _assess(plan)
     for attempt in range(MAX_FIX_ATTEMPTS):
         blocking = [f for f in findings if f.blocking]
         if not blocking:
@@ -161,15 +167,15 @@ async def recommend(db: AsyncSession, llm: LLMClient, requirements: str) -> Advi
         fix_prompt = (
             f"{user_prompt}\n\nYour previous answer:\n{plan.model_dump_json()}\n\n"
             f"Automatic checks found problems:\n{feedback}\n"
-            "Correct these problems (for example instance_count, max_instances, vcpu_per_instance, "
-            "instance_class, storage_gb, or add the missing component) and answer again with only the JSON object."
+            "Correct these problems (for example instance_class, storage_gb, backup_retention_days, "
+            "or add the missing component) and answer again with only the JSON object."
         )
         try:
             fixed = _parse_plan(await llm.complete_json(SYSTEM_PROMPT, fix_prompt))
         except (ValueError, ValidationError):
             logger.warning("Fix answer was invalid, keeping the previous plan with warnings")
             break
-        fixed_findings = check_plan(fixed)
+        fixed_findings = _assess(fixed)
         if sum(f.blocking for f in fixed_findings) <= len(blocking):
             plan, findings = fixed, fixed_findings
 

@@ -1,7 +1,7 @@
 import pytest
 
 from app.schemas.advisor import AdvisorPlan, CapacityInputs
-from app.services.capacity import add_measurement_question, check_capacity, check_data_tier, check_plan, check_security, required_peak_vcpu, required_vcpu
+from app.services.capacity import add_measurement_question, check_capacity, check_data_tier, check_plan, check_security, plan_instances, required_peak_vcpu, required_vcpu, size_compute
 
 
 def make_plan(count=4, max_count=6, vcpu=2, capacity=True, source="assumption", zones=2, questions=None, data_gb=None):
@@ -172,3 +172,80 @@ def test_single_cache_node_is_not_highly_available():
     single_zone = data_plan(zones=1, instance_class="db.m6g.large", storage_gb=100)
     single_zone.components[1].replicas = 0
     assert check_data_tier(single_zone) == []
+
+
+def spiky_capacity(zones=2, rps=1000):
+    return CapacityInputs(peak_rps=rps, cpu_ms_per_request=20, target_utilisation=0.6, availability_zones=zones)
+
+
+def test_planner_covers_peak_and_zone_loss():
+    counts = plan_instances(spiky_capacity(), vcpu_per_instance=2)  # A=33.3, B=47.1 -> 48 vCPU
+    assert counts.maximum == 24 and counts.minimum == 2
+
+
+def test_planner_rounds_to_a_multiple_of_the_zones():
+    counts = plan_instances(spiky_capacity(zones=3), vcpu_per_instance=3)  # B = 35.3 -> 36 vCPU -> 12 instances
+    assert counts.maximum == 12 and counts.maximum % 3 == 0
+
+
+def test_planner_keeps_a_larger_proposal_and_a_sensible_minimum():
+    counts = plan_instances(spiky_capacity(), 2, proposed_min=6, proposed_max=40)
+    assert (counts.minimum, counts.maximum) == (6, 40)
+    assert plan_instances(spiky_capacity(), 2, proposed_min=1).minimum == 2  # at least one per zone
+    assert plan_instances(spiky_capacity(), 2, proposed_min=99).minimum == 24  # never above the maximum
+    assert plan_instances(spiky_capacity(), 2, proposed_max=41).maximum == 42  # keeps the zone multiple
+
+
+def test_planner_ignores_zone_loss_for_a_single_zone():
+    counts = plan_instances(spiky_capacity(zones=1), vcpu_per_instance=2)  # only A = 33.3 -> 34 vCPU
+    assert counts.maximum == 17
+
+
+def sized_plan_object(count=2, max_count=2, vcpu=2, zones=2, rps=1000):
+    plan = make_plan(count=count, max_count=max_count, vcpu=vcpu, zones=zones)
+    plan.capacity.peak_rps = rps
+    return plan
+
+
+def test_size_compute_sets_counts_and_text_consistently():
+    plan = sized_plan_object()  # the model proposed 2-2 instances: 4 vCPU for 1000 rps
+    findings = size_compute(plan)
+
+    server = plan.components[0]
+    assert (server.instance_count, server.max_instances) == (2, 24)
+    assert server.sizing == "2-24 x m6i.large (2 vCPU each), auto scaling across 2 Availability Zones"
+    assert [f.code for f in findings] == ["sized"] and findings[0].informational
+    assert "2-24" in findings[0].message and "proposed 2-2" in findings[0].message
+    assert not any(f.blocking for f in check_plan(plan))
+
+
+def test_size_compute_leaves_counts_alone_when_the_proposal_is_fine_but_rewrites_the_text():
+    plan = make_plan(count=4, max_count=6, vcpu=2)  # 200 rps: 12 vCPU is enough
+    plan.components[0].sizing = "six big servers"
+    assert size_compute(plan) == []
+    assert (plan.components[0].instance_count, plan.components[0].max_instances) == (4, 6)
+    assert plan.components[0].sizing == "4-6 x m6i.large (2 vCPU each), auto scaling across 2 Availability Zones"
+
+
+def test_size_compute_fills_in_missing_counts():
+    plan = make_plan()
+    plan.components[0].instance_count = None
+    plan.components[0].max_instances = None
+    size_compute(plan)
+    assert (plan.components[0].instance_count, plan.components[0].max_instances) == (2, 6)  # 200 rps: ceil(9.41/2)=5 -> 6
+
+
+def test_size_compute_does_nothing_without_capacity_or_with_several_tiers():
+    assert size_compute(make_plan(capacity=False)) == []
+    plan = make_plan()
+    plan.components.append(plan.components[0].model_copy(update={"name": "worker"}))
+    before = [c.model_dump() for c in plan.components]
+    assert size_compute(plan) == []
+    assert [c.model_dump() for c in plan.components] == before
+
+
+def test_compute_without_instance_class_is_flagged_even_without_counts():
+    plan = make_plan()
+    plan.components[0].instance_class = None
+    plan.components[0].instance_count = None
+    assert [f.code for f in check_data_tier(plan)] == ["missing_size"]

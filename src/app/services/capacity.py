@@ -1,7 +1,7 @@
 """Deterministic checks of an advisor plan. The model proposes, this code verifies."""
 import math
 from dataclasses import dataclass
-from typing import List
+from typing import List, Optional
 
 from app.schemas.advisor import AdvisorPlan, CapacityInputs
 
@@ -16,6 +16,7 @@ class Finding:
 
 # After losing one Availability Zone the remaining servers may run hotter than the normal target.
 ZONE_LOSS_UTILISATION = 0.85
+MAX_INSTANCES = 1000
 # Database storage needs room to grow beyond the data the customer has today.
 STORAGE_HEADROOM = 1.3
 
@@ -95,7 +96,8 @@ def check_data_tier(plan: AdvisorPlan) -> List[Finding]:
     """Databases and caches need a concrete class, databases also storage that fits the data."""
     findings: List[Finding] = []
     for component in plan.components:
-        if component.role == "compute" and component.instance_count and not component.instance_class:
+        if component.role == "compute" and (component.instance_count or component.vcpu_per_instance) \
+                and not component.instance_class:
             findings.append(Finding(
                 "missing_size", f"'{component.name}' has no instance_class (for example m6i.large).", blocking=True))
         if component.role == "database" and component.multi_az is None:
@@ -146,6 +148,59 @@ def check_security(plan: AdvisorPlan) -> List[Finding]:
 
 def check_plan(plan: AdvisorPlan) -> List[Finding]:
     return check_capacity(plan) + check_data_tier(plan) + check_security(plan)
+
+
+@dataclass(frozen=True)
+class InstanceRange:
+    minimum: int
+    maximum: int
+
+
+def plan_instances(
+    capacity: CapacityInputs, vcpu_per_instance: int, proposed_min: Optional[int] = None,
+    proposed_max: Optional[int] = None,
+) -> InstanceRange:
+    """Instance counts for one compute tier, derived from the capacity inputs.
+
+    The maximum covers the peak (and the loss of one zone) and is a multiple of the zone count. The model's
+    proposal is kept when it is already larger, so a generous choice is never lowered.
+    """
+    zones = capacity.availability_zones
+    required = math.ceil(required_peak_vcpu(capacity) / vcpu_per_instance)
+    maximum = min(MAX_INSTANCES, math.ceil(max(required, proposed_max or 0, zones) / zones) * zones)
+    minimum = min(max(proposed_min or zones, zones), maximum)
+    return InstanceRange(minimum, maximum)
+
+
+def describe_compute(component, counts: InstanceRange, zones: int) -> str:
+    return (f"{counts.minimum}-{counts.maximum} x {component.instance_class or 'instance'} "
+            f"({component.vcpu_per_instance} vCPU each), auto scaling across {zones} Availability Zones")
+
+
+def size_compute(plan: AdvisorPlan) -> List[Finding]:
+    """Set the instance counts of the compute tier from the capacity inputs.
+
+    The model chooses the instance type; this function does the arithmetic, so counts and text always agree.
+    Applies when the plan has a single compute tier, with several tiers the checks decide instead.
+    Returns an informational finding when the result differs from what the model proposed.
+    """
+    compute = [c for c in plan.components if c.role == "compute" and c.vcpu_per_instance]
+    if plan.capacity is None or len(compute) != 1:
+        return []
+    component = compute[0]
+    zones = plan.capacity.availability_zones
+    counts = plan_instances(plan.capacity, component.vcpu_per_instance, component.instance_count, component.max_instances)
+    proposed = (component.instance_count, component.max_instances)
+    component.instance_count, component.max_instances = counts.minimum, counts.maximum
+    component.sizing = describe_compute(component, counts, zones)
+    if proposed == (counts.minimum, counts.maximum):
+        return []
+    return [Finding(
+        "sized",
+        f"'{component.name}': instance counts set to {counts.minimum}-{counts.maximum} by the capacity planner "
+        f"(the model proposed {proposed[0]}-{proposed[1]}).",
+        informational=True,
+    )]
 
 
 def add_measurement_question(plan: AdvisorPlan) -> AdvisorPlan:
