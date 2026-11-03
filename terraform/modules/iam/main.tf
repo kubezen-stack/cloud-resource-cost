@@ -176,7 +176,26 @@ resource "aws_iam_policy" "cost_explorer_policy" {
           "elasticloadbalancing:DescribeListeners"
         ]
         Resource = "*"
-      },
+      }
+    ]
+  })
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "${local.hostname-tag}-cost-explorer-policy-${var.environment}"
+    }
+  )
+}
+
+resource "aws_iam_policy" "pricing_policy" {
+  count       = var.enable_pricing_api ? 1 : 0
+  name        = "${local.hostname-tag}-pricing-policy"
+  description = "Read-only access to the public AWS Price List API (advisor cost estimate)"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
       {
         Effect = "Allow"
         Action = [
@@ -192,7 +211,7 @@ resource "aws_iam_policy" "cost_explorer_policy" {
   tags = merge(
     local.common_tags,
     {
-      Name = "${local.hostname-tag}-cost-explorer-policy-${var.environment}"
+      Name = "${local.hostname-tag}-pricing-policy-${var.environment}"
     }
   )
 }
@@ -306,6 +325,12 @@ resource "aws_iam_role_policy_attachment" "cost_explorer_policy_attachment" {
   count      = var.enable_cost_explorer ? 1 : 0
   role       = aws_iam_role.ec2_role.name
   policy_arn = aws_iam_policy.cost_explorer_policy[0].arn
+}
+
+resource "aws_iam_role_policy_attachment" "pricing_policy_attachment" {
+  count      = var.enable_pricing_api ? 1 : 0
+  role       = aws_iam_role.ec2_role.name
+  policy_arn = aws_iam_policy.pricing_policy[0].arn
 }
 
 resource "aws_iam_role_policy_attachment" "vault_hashicorp_policy_attachment" {

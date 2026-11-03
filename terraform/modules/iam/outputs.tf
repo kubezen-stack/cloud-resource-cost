@@ -75,6 +75,7 @@ output "summary_iam" {
       1 +
       (var.enable_cloudwatch ? 1 : 0) +
       (var.enable_cost_explorer ? 1 : 0) +
+      (var.enable_pricing_api ? 1 : 0) +
       (var.enable_vault_auth ? 1 : 0) +
       (var.enable_ecr ? 1 : 0)
     )

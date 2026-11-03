@@ -14,6 +14,12 @@ variable "enable_cost_explorer" {
   default     = true
 }
 
+variable "enable_pricing_api" {
+  description = "Allow reading the public AWS Price List API (used by the advisor cost estimate)"
+  type        = bool
+  default     = true
+}
+
 variable "enable_cloudwatch" {
   description = "Enable CloudWatch API permissions"
   type        = bool
