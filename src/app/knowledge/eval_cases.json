@@ -92,7 +92,7 @@
   },
   {
     "name": "spiky_sales",
-    "requirements": "Ticket sales site. Normal traffic is low but when a popular event opens, traffic grows 50 times within minutes for about an hour. Orders must not be lost.",
+    "requirements": "Ticket sales site. Normal traffic is about 20 requests per second, but when a popular event opens, traffic grows 50 times within minutes (about 1,000 requests per second) for roughly an hour. Orders must not be lost.",
     "must_cover": {
       "scaling": [
         "auto scaling",

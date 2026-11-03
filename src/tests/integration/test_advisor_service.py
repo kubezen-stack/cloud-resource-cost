@@ -288,3 +288,13 @@ async def test_capacity_object_with_null_numbers_means_no_capacity(db_session):
     result = await recommend(db_session, llm, REQUIREMENTS)
 
     assert len(llm.calls) == 1 and result.plan.capacity is None
+
+
+@pytest.mark.asyncio
+async def test_prompt_asks_for_a_data_store_and_the_spiky_case_states_traffic(db_session):
+    from app.services.advisor_eval import load_cases
+    from app.services.advisor_service import SYSTEM_PROMPT
+
+    assert "data store component" in SYSTEM_PROMPT
+    spiky = next(c for c in load_cases() if c["name"] == "spiky_sales")
+    assert "requests per second" in spiky["requirements"] and spiky["require_capacity"]
