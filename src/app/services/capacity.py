@@ -177,6 +177,12 @@ def describe_compute(component, counts: InstanceRange, zones: int) -> str:
             f"({component.vcpu_per_instance} vCPU each), auto scaling across {zones} Availability Zones")
 
 
+def _proposed_text(proposed: tuple) -> str:
+    if None in proposed:
+        return "the model gave no instance counts"
+    return f"the model proposed {proposed[0]}-{proposed[1]}"
+
+
 def size_compute(plan: AdvisorPlan) -> List[Finding]:
     """Set the instance counts of the compute tier from the capacity inputs.
 
@@ -198,7 +204,7 @@ def size_compute(plan: AdvisorPlan) -> List[Finding]:
     return [Finding(
         "sized",
         f"'{component.name}': instance counts set to {counts.minimum}-{counts.maximum} by the capacity planner "
-        f"(the model proposed {proposed[0]}-{proposed[1]}).",
+        f"({_proposed_text(proposed)}).",
         informational=True,
     )]
 

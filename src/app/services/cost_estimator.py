@@ -233,7 +233,7 @@ def _reserved(item: Priced, caveats: List[str]) -> Priced:
         return item
     reserved = item.product.reserved(years=1, offering_class="standard", purchase="No Upfront")
     if not reserved:
-        caveats.append(f"No 1 year reserved price found for {item.instance_type}: kept at on-demand")
+        caveats.append(f"No 1 year no-upfront reserved price is offered for {item.instance_type}: kept at on-demand")
         return item
     return replace(item, price=reserved, item=f"{item.item} (1 year reserved, no upfront)")
 
