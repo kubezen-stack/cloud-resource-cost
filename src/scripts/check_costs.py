@@ -4,6 +4,9 @@ import os
 import urllib.request
 from datetime import datetime, timedelta
 
+from app.services.anomaly_alerts import anomalies_on, describe
+from app.services.anomaly_service import detect_anomalies
+
 TELEGRAM_BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 TELEGRAM_CHAT_ID   = os.environ["TELEGRAM_CHAT_ID"]
 ALERT_EMAIL        = os.environ.get("ALERT_EMAIL", "")
@@ -14,6 +17,12 @@ ANOMALY_THRESHOLD  = float(os.environ.get("ANOMALY_THRESHOLD", "10"))
 TODAY       = datetime.utcnow().strftime("%Y-%m-%d")
 YESTERDAY   = (datetime.utcnow() - timedelta(days=1)).strftime("%Y-%m-%d")
 MONTH_START = datetime.utcnow().replace(day=1).strftime("%Y-%m-%d")
+
+# Days of history given to the anomaly detector (it needs at least 21).
+HISTORY_DAYS  = 90
+HISTORY_START = (datetime.utcnow() - timedelta(days=HISTORY_DAYS)).strftime("%Y-%m-%d")
+# Cost Explorer settles a day late, so the job reports the day before yesterday.
+REPORT_DAY    = (datetime.utcnow() - timedelta(days=2)).date()
 
 
 def get_costs():
@@ -49,6 +58,34 @@ def get_costs():
     )[:5]
 
     return mtd_cost, yesterday_cost, top_services
+
+
+def get_daily_service_costs():
+    ce = boto3.client("ce", region_name="us-east-1")
+    results, token = [], None
+    while True:
+        params = {
+            "TimePeriod": {"Start": HISTORY_START, "End": TODAY},
+            "Granularity": "DAILY",
+            "Metrics": ["UnblendedCost"],
+            "GroupBy": [{"Type": "DIMENSION", "Key": "SERVICE"}],
+        }
+        if token:
+            params["NextPageToken"] = token
+        page = ce.get_cost_and_usage(**params)
+        results.extend(page["ResultsByTime"])
+        token = page.get("NextPageToken")
+        if not token:
+            return results
+
+
+def find_anomalies():
+    """Anomalies of REPORT_DAY, or None when the check could not run (the report still goes out)."""
+    try:
+        return anomalies_on(detect_anomalies(get_daily_service_costs()), REPORT_DAY)
+    except Exception as exc:
+        print(f"Anomaly check skipped: {exc}")
+        return None
 
 
 def send_telegram(message):
@@ -88,6 +125,7 @@ def set_output(name, value):
 
 def main():
     mtd_cost, yesterday_cost, top_services = get_costs()
+    anomalies = find_anomalies()
     budget_percent = round((mtd_cost / BUDGET_LIMIT) * 100, 1)
     services_text  = "\n".join(f"  • {s['name']}: `${s['cost']}`" for s in top_services)
 
@@ -97,6 +135,9 @@ def main():
     elif mtd_cost >= BUDGET_LIMIT * 0.8:
         emoji = "⚠️"
         alert = f"*80% budget used!* MTD `${mtd_cost}` of `${BUDGET_LIMIT}`."
+    elif anomalies:
+        emoji = "🔍"
+        alert = f"*Unusual cost on {REPORT_DAY}:* " + "; ".join(describe(a) for a in anomalies)
     elif yesterday_cost >= ANOMALY_THRESHOLD:
         emoji = "🔍"
         alert = f"*Cost anomaly!* Yesterday `${yesterday_cost}` exceeds threshold `${ANOMALY_THRESHOLD}`."
