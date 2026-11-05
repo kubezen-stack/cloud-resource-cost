@@ -5,7 +5,8 @@ import urllib.request
 from datetime import datetime, timedelta
 
 from app.services.anomaly_alerts import anomalies_on, describe
-from app.services.anomaly_service import detect_anomalies
+from app.services.anomaly_explain import describe_drivers, explain_spike, parse_usage_costs
+from app.services.anomaly_service import BASELINE_WINDOW, detect_anomalies
 
 TELEGRAM_BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 TELEGRAM_CHAT_ID   = os.environ["TELEGRAM_CHAT_ID"]
@@ -23,6 +24,8 @@ HISTORY_DAYS  = 90
 HISTORY_START = (datetime.utcnow() - timedelta(days=HISTORY_DAYS)).strftime("%Y-%m-%d")
 # Cost Explorer settles a day late, so the job reports the day before yesterday.
 REPORT_DAY    = (datetime.utcnow() - timedelta(days=2)).date()
+# Every explained anomaly costs one more Cost Explorer request, so only the biggest are explained.
+MAX_EXPLAINED = 3
 
 
 def get_costs():
@@ -60,23 +63,52 @@ def get_costs():
     return mtd_cost, yesterday_cost, top_services
 
 
-def get_daily_service_costs():
+def cost_explorer_pages(**params):
+    """All result periods of a Cost Explorer query, following the pagination token."""
     ce = boto3.client("ce", region_name="us-east-1")
-    results, token = [], None
+    results = []
     while True:
-        params = {
-            "TimePeriod": {"Start": HISTORY_START, "End": TODAY},
-            "Granularity": "DAILY",
-            "Metrics": ["UnblendedCost"],
-            "GroupBy": [{"Type": "DIMENSION", "Key": "SERVICE"}],
-        }
-        if token:
-            params["NextPageToken"] = token
         page = ce.get_cost_and_usage(**params)
         results.extend(page["ResultsByTime"])
         token = page.get("NextPageToken")
         if not token:
             return results
+        params["NextPageToken"] = token
+
+
+def get_daily_service_costs():
+    return cost_explorer_pages(
+        TimePeriod={"Start": HISTORY_START, "End": TODAY},
+        Granularity="DAILY",
+        Metrics=["UnblendedCost"],
+        GroupBy=[{"Type": "DIMENSION", "Key": "SERVICE"}],
+    )
+
+
+def get_usage_costs(service, day):
+    """Daily costs of one service by usage type and region: the day and the baseline before it."""
+    return cost_explorer_pages(
+        TimePeriod={"Start": str(day - timedelta(days=BASELINE_WINDOW)), "End": str(day + timedelta(days=1))},
+        Granularity="DAILY",
+        Metrics=["UnblendedCost"],
+        Filter={"Dimensions": {"Key": "SERVICE", "Values": [service]}},
+        GroupBy=[{"Type": "DIMENSION", "Key": "USAGE_TYPE"}, {"Type": "DIMENSION", "Key": "REGION"}],
+    )
+
+
+def explain(anomaly):
+    """What grew behind an anomaly, or None when it cannot be found (the alert still goes out)."""
+    try:
+        series = parse_usage_costs(get_usage_costs(anomaly.service, anomaly.day))
+        return describe_drivers(explain_spike(series, anomaly.day))
+    except Exception as exc:
+        print(f"Could not explain the anomaly of {anomaly.service}: {exc}")
+        return None
+
+
+def describe_with_driver(anomaly, explain_it):
+    driver = explain(anomaly) if explain_it else None
+    return describe(anomaly) + (f" — {driver}" if driver else "")
 
 
 def find_anomalies():
@@ -137,7 +169,9 @@ def main():
         alert = f"*80% budget used!* MTD `${mtd_cost}` of `${BUDGET_LIMIT}`."
     elif anomalies:
         emoji = "🔍"
-        alert = f"*Unusual cost on {REPORT_DAY}:* " + "; ".join(describe(a) for a in anomalies)
+        biggest = sorted(anomalies, key=lambda a: a.actual_cost - a.expected_cost, reverse=True)
+        lines = [describe_with_driver(a, i < MAX_EXPLAINED) for i, a in enumerate(biggest)]
+        alert = f"*Unusual cost on {REPORT_DAY}:* " + "; ".join(lines)
     elif yesterday_cost >= ANOMALY_THRESHOLD:
         emoji = "🔍"
         alert = f"*Cost anomaly!* Yesterday `${yesterday_cost}` exceeds threshold `${ANOMALY_THRESHOLD}`."
