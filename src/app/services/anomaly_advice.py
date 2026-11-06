@@ -114,6 +114,11 @@ def _allowed_amounts(anomaly: Anomaly, drivers: List[Driver]) -> List[float]:
     return amounts
 
 
+def _usage_type(evidence: str) -> str:
+    """The usage type of an evidence entry; the model may add the region in brackets, as the facts show it."""
+    return re.sub(r"\s*\([^)]*\)\s*$", "", evidence).strip()
+
+
 def check_advice(advice: SpikeAdvice, anomaly: Anomaly, drivers: List[Driver]) -> List[str]:
     """What is wrong with the advice: amounts that are not facts, evidence that did not grow."""
     problems: List[str] = []
@@ -125,7 +130,7 @@ def check_advice(advice: SpikeAdvice, anomaly: Anomaly, drivers: List[Driver]) -
     if invented:
         problems.append("dollar amounts that are not in the facts: " + ", ".join(sorted(f"${a}" for a in invented)))
     known = {d.usage_type for d in drivers}
-    unknown = {e for h in advice.hypotheses for e in h.evidence if e not in known}
+    unknown = {e for h in advice.hypotheses for e in h.evidence if _usage_type(e) not in known}
     if unknown or any(not h.evidence for h in advice.hypotheses):
         problems.append("every cause needs evidence from the usage types in the facts"
                         + (f" (not in the facts: {', '.join(sorted(unknown))})" if unknown else ""))

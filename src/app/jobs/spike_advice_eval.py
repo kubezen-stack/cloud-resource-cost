@@ -1,6 +1,6 @@
 """Check the quality of the advice given for cost spikes, on cases with a known cause.
 
-    LLM_API_KEY=... python -m app.jobs.spike_advice_eval [--runs 1]
+    LLM_API_KEY=... python -m app.jobs.spike_advice_eval [--runs 1] [--case NAME]
 
 Needs only an API key (LLM_MODEL picks the model, gpt-4o by default). No database. Every run costs
 a few cents: one request per case and run.
@@ -43,13 +43,30 @@ def format_report(results: list) -> str:
     return "\n".join(lines)
 
 
-async def main(runs: int) -> int:
+def select_cases(name=None) -> list:
+    """All cases, or the one called `name` (ValueError with the known names if there is none)."""
+    cases = load_cases()
+    if name is None:
+        return cases
+    chosen = [c for c in cases if c["name"] == name]
+    if not chosen:
+        raise ValueError(f"Unknown case '{name}'. Cases: {', '.join(c['name'] for c in cases)}")
+    return chosen
+
+
+async def main(runs: int, case=None) -> int:
     llm = client_from_env()
     if llm is None:
         print("Cannot run: LLM_API_KEY is not set")
         return 1
     try:
-        results = await run(llm, runs)
+        cases = select_cases(case)
+    except ValueError as exc:
+        print(exc)
+        await llm.aclose()
+        return 1
+    try:
+        results = await run(llm, runs, cases)
     finally:
         await llm.aclose()
     print(format_report(results))
@@ -59,4 +76,6 @@ async def main(runs: int) -> int:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--runs", type=int, default=1, help="answers requested per case")
-    raise SystemExit(asyncio.run(main(parser.parse_args().runs)))
+    parser.add_argument("--case", help="run only this case")
+    args = parser.parse_args()
+    raise SystemExit(asyncio.run(main(args.runs, args.case)))

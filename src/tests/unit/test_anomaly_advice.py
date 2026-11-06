@@ -123,3 +123,15 @@ def test_the_notification_text_is_limited():
     long = "word " * 2000
     advice = SpikeAdvice.model_validate(json.loads(answer(summary="x", expected_if=long)))
     assert len(format_advice(advice)) <= MAX_ADVICE_CHARS + 1
+
+
+def test_evidence_may_carry_the_region_in_brackets():
+    advice = SpikeAdvice.model_validate(json.loads(answer(
+        hypotheses=[{"cause": "x", "evidence": ["EUC1-NatGateway-Bytes (eu-central-1)"], "how_to_check": "y"}])))
+    assert check_advice(advice, ANOMALY, [NAT]) == []
+
+
+def test_evidence_with_another_usage_type_is_still_rejected_when_bracketed():
+    advice = SpikeAdvice.model_validate(json.loads(answer(
+        hypotheses=[{"cause": "x", "evidence": ["EUC1-Other (eu-central-1)"], "how_to_check": "y"}])))
+    assert len(check_advice(advice, ANOMALY, [NAT])) == 1
