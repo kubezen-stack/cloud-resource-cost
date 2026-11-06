@@ -2,7 +2,7 @@ name: Cost Alerts
 
 on:
   schedule:
-    - cron: "0 9 * * *"  
+    - cron: "0 9 * * *"
   workflow_dispatch:
     inputs:
       environment:
@@ -39,7 +39,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: pip install boto3
+        run: pip install boto3 numpy==2.1.3 scikit-learn==1.5.2 httpx==0.27.2 pydantic==2.9.2
 
       - name: Check costs and send alerts
         id: cost_check
@@ -50,6 +50,9 @@ jobs:
           ENVIRONMENT: ${{ env.ENVIRONMENT }}
           BUDGET_LIMIT: ${{ vars.BUDGET_LIMIT }}
           ANOMALY_THRESHOLD: ${{ vars.ANOMALY_THRESHOLD }}
+          PYTHONPATH: src
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_MODEL: ${{ vars.LLM_MODEL }}
         run: python3 src/scripts/check_costs.py
 
       - name: Send Telegram summary
