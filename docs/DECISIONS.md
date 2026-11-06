@@ -145,6 +145,21 @@ baselines are fooled by growth and by multi-day plateaus.
 **Limit.** Only increases are reported. The guardrails were tuned on the same kinds of synthetic series
 as the benchmark, so the precision is optimistic and needs confirmation on real billing history.
 
+## 9a. Explaining a spike with facts, not guesses
+
+**Decision.** When the detector finds an anomaly, the daily notification names the usage types behind it
+(one more Cost Explorer request per anomaly, at most three per run). The method is plain arithmetic:
+increase over the 14-day median per usage type and region, largest first. No model is involved.
+
+**Why.** "EC2 cost $160 instead of $51" leaves the reader to find the cause in the console. Ranking by
+dollars rather than by relative growth keeps tiny noisy lines from outranking the one that cost $30 more.
+Measured on synthetic services ([experiments/spike-attribution.md](experiments/spike-attribution.md)):
+the right usage type is named first in 96% of cases on average, against 12% for "the biggest line of the bill"
+and 91% for relative growth, which is better only when a single small line is the whole story.
+
+**Limits.** It says what grew, not why. A later step can let a model turn these facts into hypotheses and
+actions, constrained by them.
+
 ## 10. Rightsizing from CPU only
 
 **Decision.** Instance advice uses hourly average and maximum CPU from CloudWatch over at least seven
