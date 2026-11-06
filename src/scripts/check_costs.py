@@ -1,12 +1,15 @@
+import asyncio
 import boto3
 import json
 import os
 import urllib.request
 from datetime import datetime, timedelta
 
+from app.services.anomaly_advice import advise, format_advice
 from app.services.anomaly_alerts import anomalies_on, describe
 from app.services.anomaly_explain import describe_drivers, explain_spike, parse_usage_costs
 from app.services.anomaly_service import BASELINE_WINDOW, detect_anomalies
+from app.services.llm_client import client_from_env
 
 TELEGRAM_BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 TELEGRAM_CHAT_ID   = os.environ["TELEGRAM_CHAT_ID"]
@@ -96,19 +99,35 @@ def get_usage_costs(service, day):
     )
 
 
-def explain(anomaly):
-    """What grew behind an anomaly, or None when it cannot be found (the alert still goes out)."""
+def find_drivers(anomaly):
+    """The usage types behind an anomaly, or None when they cannot be found (the alert still goes out)."""
     try:
         series = parse_usage_costs(get_usage_costs(anomaly.service, anomaly.day))
-        return describe_drivers(explain_spike(series, anomaly.day))
+        return explain_spike(series, anomaly.day)
     except Exception as exc:
         print(f"Could not explain the anomaly of {anomaly.service}: {exc}")
         return None
 
 
-def describe_with_driver(anomaly, explain_it):
-    driver = explain(anomaly) if explain_it else None
-    return describe(anomaly) + (f" — {driver}" if driver else "")
+async def _advise(llm, anomaly, drivers):
+    try:
+        return await advise(llm, anomaly, drivers)
+    finally:
+        await llm.aclose()
+
+
+def get_advice(anomaly, drivers):
+    """Possible causes and next steps from the model, or None (no API key, no facts, no valid answer)."""
+    if not drivers:
+        return None
+    llm = client_from_env()
+    if llm is None:
+        return None
+    try:
+        return format_advice(asyncio.run(_advise(llm, anomaly, drivers)))
+    except Exception as exc:
+        print(f"Advice skipped: {exc}")
+        return None
 
 
 def find_anomalies():
@@ -158,6 +177,7 @@ def set_output(name, value):
 def main():
     mtd_cost, yesterday_cost, top_services = get_costs()
     anomalies = find_anomalies()
+    advice = None
     budget_percent = round((mtd_cost / BUDGET_LIMIT) * 100, 1)
     services_text  = "\n".join(f"  • {s['name']}: `${s['cost']}`" for s in top_services)
 
@@ -170,8 +190,10 @@ def main():
     elif anomalies:
         emoji = "🔍"
         biggest = sorted(anomalies, key=lambda a: a.actual_cost - a.expected_cost, reverse=True)
-        lines = [describe_with_driver(a, i < MAX_EXPLAINED) for i, a in enumerate(biggest)]
+        found = [find_drivers(a) if i < MAX_EXPLAINED else None for i, a in enumerate(biggest)]
+        lines = [describe(a) + (f" — {describe_drivers(d)}" if d else "") for a, d in zip(biggest, found)]
         alert = f"*Unusual cost on {REPORT_DAY}:* " + "; ".join(lines)
+        advice = get_advice(biggest[0], found[0])
     elif yesterday_cost >= ANOMALY_THRESHOLD:
         emoji = "🔍"
         alert = f"*Cost anomaly!* Yesterday `${yesterday_cost}` exceeds threshold `${ANOMALY_THRESHOLD}`."
@@ -179,15 +201,27 @@ def main():
         emoji = "✅"
         alert = ""
 
-    if alert:
-        send_telegram(
+    def compose(with_advice):
+        return (
             f"{emoji} *AWS Cost Alert — {ENVIRONMENT.upper()}*\n\n"
             f"{alert}\n\n"
-            f"💰 MTD: `${mtd_cost}` / `${BUDGET_LIMIT}` ({budget_percent}%)\n"
+            + (f"{with_advice}\n\n" if with_advice else "")
+            + f"💰 MTD: `${mtd_cost}` / `${BUDGET_LIMIT}` ({budget_percent}%)\n"
             f"📈 Yesterday: `${yesterday_cost}`\n\n"
             f"*Top services:*\n{services_text}\n\n"
             f"[AWS Cost Explorer](https://console.aws.amazon.com/cost-management/home)"
         )
+
+    if alert:
+        sent = False
+        if advice:
+            try:
+                send_telegram(compose(advice))
+                sent = True
+            except Exception as exc:
+                print(f"Telegram refused the alert with advice, sending it without: {exc}")
+        if not sent:
+            send_telegram(compose(None))
         send_email(
             subject=f"[{ENVIRONMENT.upper()}] AWS Cost Alert — {budget_percent}% budget used",
             body=f"MTD: ${mtd_cost} / ${BUDGET_LIMIT} ({budget_percent}%)\nYesterday: ${yesterday_cost}\n\n{alert}",

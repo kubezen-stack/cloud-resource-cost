@@ -1,9 +1,9 @@
 """Thin LLM client. The advisor depends on the LLMClient protocol only, so the
 provider can be swapped in one place (see get_llm_client)."""
 import logging
-from typing import List, Optional, Protocol
+import os
+from typing import List, Mapping, Optional, Protocol
 import httpx
-from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -99,6 +99,8 @@ class OpenAICompatibleClient:
 
 
 def get_llm_client() -> LLMClient:
+    from app.core.config import settings
+
     if not settings.LLM_API_KEY:
         raise LLMNotConfigured("LLM_API_KEY is not set")
     if settings.LLM_PROVIDER != "openai":
@@ -109,4 +111,18 @@ def get_llm_client() -> LLMClient:
         model=settings.LLM_MODEL,
         embedding_model=settings.EMBEDDING_MODEL,
         timeout=settings.LLM_TIMEOUT_SECONDS,
+    )
+
+
+def client_from_env(env: Mapping[str, str] = os.environ) -> Optional[LLMClient]:
+    """A client configured from LLM_API_KEY, LLM_MODEL and LLM_BASE_URL, or None without a key.
+
+    For scripts and jobs that run outside the application (no database, no other settings)."""
+    if not env.get("LLM_API_KEY"):
+        return None
+    return OpenAICompatibleClient(
+        api_key=env["LLM_API_KEY"],
+        base_url=env.get("LLM_BASE_URL") or "https://api.openai.com/v1",
+        model=env.get("LLM_MODEL") or "gpt-4o",
+        embedding_model=env.get("EMBEDDING_MODEL") or "text-embedding-3-small",
     )
