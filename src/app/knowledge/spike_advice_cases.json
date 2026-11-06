@@ -1,0 +1,70 @@
+[
+  {
+    "name": "nat_bytes",
+    "anomaly": {"service": "Amazon Virtual Private Cloud", "day": "2026-11-03", "actual_cost": 162.0, "expected_cost": 51.0},
+    "drivers": [
+      {"usage_type": "EUC1-NatGateway-Bytes", "region": "eu-central-1", "actual_cost": 110.0, "expected_cost": 2.0, "is_new": false}
+    ],
+    "must_cover": {
+      "endpoint": ["endpoint"],
+      "traffic_check": ["flow log", "bytesout", "cloudwatch"],
+      "s3_or_dynamodb": ["s3", "dynamodb"]
+    },
+    "must_not": ["delete the database"],
+    "min_questions": 1
+  },
+  {
+    "name": "new_instances",
+    "anomaly": {"service": "Amazon Elastic Compute Cloud - Compute", "day": "2026-11-03", "actual_cost": 252.0, "expected_cost": 120.0},
+    "drivers": [
+      {"usage_type": "EUC1-BoxUsage:m6i.xlarge", "region": "eu-central-1", "actual_cost": 92.0, "expected_cost": 0.0, "is_new": true},
+      {"usage_type": "EUC1-BoxUsage:m6i.large", "region": "eu-central-1", "actual_cost": 160.0, "expected_cost": 120.0, "is_new": false}
+    ],
+    "must_cover": {
+      "scaling": ["auto scaling", "autoscaling", "scaling"],
+      "who_launched": ["cloudtrail", "runinstances", "activity history", "launch"],
+      "cleanup": ["terminate", "stop"]
+    },
+    "must_not": ["delete the database"],
+    "min_questions": 1
+  },
+  {
+    "name": "data_transfer_out",
+    "anomaly": {"service": "Amazon Elastic Compute Cloud - Compute", "day": "2026-11-03", "actual_cost": 95.0, "expected_cost": 25.0},
+    "drivers": [
+      {"usage_type": "EUC1-DataTransfer-Out-Bytes", "region": "eu-central-1", "actual_cost": 75.0, "expected_cost": 5.0, "is_new": false}
+    ],
+    "must_cover": {
+      "cdn": ["cloudfront"],
+      "where_to_look": ["cost explorer", "usage type", "flow log"]
+    },
+    "must_not": ["delete the database"],
+    "min_questions": 1
+  },
+  {
+    "name": "snapshots",
+    "anomaly": {"service": "EC2 - Other", "day": "2026-11-03", "actual_cost": 90.0, "expected_cost": 42.0},
+    "drivers": [
+      {"usage_type": "EUC1-EBS:SnapshotUsage", "region": "eu-central-1", "actual_cost": 60.0, "expected_cost": 12.0, "is_new": false}
+    ],
+    "must_cover": {
+      "retention": ["lifecycle", "retention", "aws backup"],
+      "cleanup": ["delete", "remove", "clean"]
+    },
+    "must_not": ["delete the database"],
+    "min_questions": 1
+  },
+  {
+    "name": "unknown_usage_type",
+    "anomaly": {"service": "Amazon Example Service", "day": "2026-11-03", "actual_cost": 40.0, "expected_cost": 0.0},
+    "drivers": [
+      {"usage_type": "EUC1-Xyz:Custom-Thing", "region": "eu-central-1", "actual_cost": 40.0, "expected_cost": 0.0, "is_new": true}
+    ],
+    "must_cover": {
+      "where_to_look": ["cloudtrail", "cost explorer"],
+      "owner": ["owner", "who", "team"]
+    },
+    "must_not": ["definitely", "certainly", "the cause is"],
+    "min_questions": 1
+  }
+]
