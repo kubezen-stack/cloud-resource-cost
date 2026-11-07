@@ -22,3 +22,8 @@ output "dynamodb_table_arn" {
   description = "The ARN of the DynamoDB table created for bootstrapping"
   value       = aws_dynamodb_table.terraform_locks.arn
 }
+
+output "github_cost_alerts_role_arn" {
+  description = "Role for the Cost Alerts workflow: save it as the GitHub variable AWS_COST_ALERTS_ROLE_ARN"
+  value       = aws_iam_role.cost_alerts.arn
+}
