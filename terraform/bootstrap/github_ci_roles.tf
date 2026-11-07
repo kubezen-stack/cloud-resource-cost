@@ -71,7 +71,7 @@ data "aws_iam_policy_document" "ci_state_read" {
     condition {
       test     = "StringLike"
       variable = "s3:prefix"
-      values   = ["${each.key}/*"]
+      values   = ["${each.key}/*", "env:/*"]
     }
   }
 
@@ -182,7 +182,7 @@ data "aws_iam_policy_document" "terraform" {
     condition {
       test     = "StringLike"
       variable = "s3:prefix"
-      values   = ["${each.key}/*"]
+      values   = ["${each.key}/*", "env:/*"]
     }
   }
 
