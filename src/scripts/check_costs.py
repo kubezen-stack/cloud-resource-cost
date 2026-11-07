@@ -13,7 +13,6 @@ from app.services.llm_client import client_from_env
 
 TELEGRAM_BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 TELEGRAM_CHAT_ID   = os.environ["TELEGRAM_CHAT_ID"]
-ALERT_EMAIL        = os.environ.get("ALERT_EMAIL", "")
 ENVIRONMENT        = os.environ.get("ENVIRONMENT", "dev")
 BUDGET_LIMIT       = float(os.environ.get("BUDGET_LIMIT", "30"))
 ANOMALY_THRESHOLD  = float(os.environ.get("ANOMALY_THRESHOLD", "10"))
@@ -154,19 +153,6 @@ def send_telegram(message):
     urllib.request.urlopen(req)
 
 
-def send_email(subject, body):
-    if not ALERT_EMAIL:
-        return
-    boto3.client("ses", region_name="us-east-1").send_email(
-        Source=ALERT_EMAIL,
-        Destination={"ToAddresses": [ALERT_EMAIL]},
-        Message={
-            "Subject": {"Data": subject},
-            "Body": {"Text": {"Data": body}},
-        },
-    )
-
-
 def set_output(name, value):
     output_file = os.environ.get("GITHUB_OUTPUT", "")
     if output_file:
@@ -222,10 +208,6 @@ def main():
                 print(f"Telegram refused the alert with advice, sending it without: {exc}")
         if not sent:
             send_telegram(compose(None))
-        send_email(
-            subject=f"[{ENVIRONMENT.upper()}] AWS Cost Alert — {budget_percent}% budget used",
-            body=f"MTD: ${mtd_cost} / ${BUDGET_LIMIT} ({budget_percent}%)\nYesterday: ${yesterday_cost}\n\n{alert}",
-        )
 
     set_output("mtd_cost",       str(mtd_cost))
     set_output("yesterday_cost", str(yesterday_cost))
