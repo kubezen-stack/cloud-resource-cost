@@ -45,16 +45,10 @@ data "aws_iam_policy_document" "cost_alerts" {
     actions   = ["ce:GetCostAndUsage"]
     resources = ["*"]
   }
-
-  statement {
-    sid       = "SendAlertEmail"
-    actions   = ["ses:SendEmail"]
-    resources = ["*"]
-  }
 }
 
 resource "aws_iam_role_policy" "cost_alerts" {
-  name   = "read-costs-and-send-email"
+  name = "read-costs"
   role   = aws_iam_role.cost_alerts.id
   policy = data.aws_iam_policy_document.cost_alerts.json
 }
