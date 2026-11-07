@@ -97,6 +97,7 @@ instead of a price table in the repository. Results are cached in process for 24
 for `eu-central-1` (ALB, EC2, RDS Multi-AZ, gp3 storage, ElastiCache, NAT Gateway).
 
 **How totals are built.**
+
 - Fixed charges only, list price, 730 hours per month. Compute is counted at the minimum instance count;
   the upper bound counts every instance at the maximum for the whole month. The real bill lies between
   them depending on how long peaks last.
@@ -160,6 +161,38 @@ and 91% for relative growth, which is better only when a single small line is th
 **Limits.** It says what grew, not why. A later step can let a model turn these facts into hypotheses and
 actions, constrained by them.
 
+## 9b. Advice for a spike: the model writes, the code checks
+
+**Decision.** For the largest anomaly of a run, a model receives the measured facts (service, day, the usage
+types that grew with their costs) and a short playbook of typical causes (`app/knowledge/spikes/playbook.md`),
+and returns possible causes, next steps, the situation in which the increase is expected, and questions. It runs
+only when `LLM_API_KEY` is set, once per run, and the notification is sent without advice if anything fails.
+
+**What the code checks.** The answer may contain only dollar amounts that appear in the facts (within $0.50),
+and every cause must cite usage types that really grew. A failed answer is sent back once with the reason, then
+dropped. A step citing a playbook section that does not exist is shown as general advice. Text is stripped of
+Markdown characters, because Telegram refuses a message it cannot parse; if it refuses the message with advice,
+the alert goes out without it.
+
+**Why a playbook and not the advisor's catalog.** The catalog lives in PostgreSQL and is searched by embeddings;
+the notification job runs in GitHub Actions with no database. The playbook is 16 short sections, small enough to
+go into every prompt, so no retrieval is needed. It also keeps this feature from changing what the architecture
+advisor retrieves.
+
+**Why it cannot say "this is normal".** The system sees the bill, not the plans of the team. The advice gives the
+condition ("this is expected if a migration ran that day") and asks the questions that settle it.
+
+**Quality.** `python -m app.jobs.spike_advice_eval` runs five cases with a known cause (NAT data, new instances,
+data transfer, snapshots, an unknown usage type) and scores topic coverage, forbidden phrases and questions asked.
+It costs a few cents per run, so it is run by hand.
+
+**Result** (`gpt-4o`, one answer per case). First run: 8 of 9 cases passed with full topic coverage and no forbidden
+phrase. The ninth failed because the evidence check was too strict: the model wrote a usage type with its region
+in brackets, as the facts show it, and the check compared the strings exactly, so the advice would have been
+dropped in production. The check now ignores a trailing bracket (a different usage type is still rejected), and
+the case passes. One answer per case shows that the advice is useful, not that it is stable; repeat with
+`--runs 3` before relying on it.
+
 ## 10. Rightsizing from CPU only
 
 **Decision.** Instance advice uses hourly average and maximum CPU from CloudWatch over at least seven
@@ -176,6 +209,7 @@ is what keeps a "keep" from turning into a throttled instance.
 when idle (two `t3.medium` nodes cost about $2 a day).
 
 **Consequences handled in code and runbook.**
+
 - The runner name is derived from the Elastic IP, which survives recreation, so a stale registration
   exists in GitHub. The runner is registered with `--replace`, and the registration token is passed
   through the environment so it stays out of the logs.
@@ -183,9 +217,28 @@ when idle (two `t3.medium` nodes cost about $2 a day).
 - The public host is `stage.<elastic-ip>.sslip.io` with Let's Encrypt staging certificates, so no
   domain is needed.
 
+## 12. GitHub Actions signs in to AWS with OIDC
+
+**Decision.** Workflows assume an IAM role through the GitHub OIDC provider instead of using a stored
+access key. The provider and the roles are in `terraform/bootstrap`. The first role belongs to Cost
+Alerts and may only call `ce:GetCostAndUsage`. Its trust policy accepts only the `main` branch of this
+repository (`sub` = `repo:<owner>/<repo>:ref:refs/heads/main`). The role ARN is a GitHub variable,
+not a secret, because it grants nothing without a valid GitHub token.
+
+**Why.** A stored key never expires and is shared by every job. A role gives about an hour of
+credentials, can be limited per job, and leaves nothing to leak from the repository settings.
+
+**Why one narrow role per job.** The old CI user can create and delete infrastructure; the daily cost
+check only needs to read the bill. Email through SES is left out on purpose: alerts go to Telegram.
+
+**Left to do.** Ansible, deploy and Terraform still use the static key. They need their own roles
+(Environment jobs have `sub` = `repo:<owner>/<repo>:environment:<name>`), then the key and its secrets
+can be deleted.
+
 ## Known gaps
 
 - Cost forecasting uses the Cost Explorer forecast API; the project has no forecasting model of its own to evaluate.
 - `ingest_knowledge` is a manual step after deployment; it should become a Helm hook or a pipeline step.
 - The evaluation is not part of CI because it calls a paid API.
 - Peak duration is not an input of the cost estimate, so it reports a range instead of one expected figure.
+- Three workflows still use a static AWS key until their OIDC roles exist (see 12).
