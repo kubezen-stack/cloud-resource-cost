@@ -27,3 +27,13 @@ output "github_cost_alerts_role_arn" {
   description = "Role for the Cost Alerts workflow: save it as the GitHub variable AWS_COST_ALERTS_ROLE_ARN"
   value       = aws_iam_role.cost_alerts.arn
 }
+
+output "github_ci_role_arns" {
+  description = "Roles of the Terraform, Ansible and deploy workflows, per environment"
+  value       = { for key, role in aws_iam_role.ci : key => role.arn }
+}
+
+output "aws_account_id" {
+  description = "Save as the GitHub variable AWS_ACCOUNT_ID: the workflows build the role ARNs from it"
+  value       = data.aws_caller_identity.current.account_id
+}

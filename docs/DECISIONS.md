@@ -231,9 +231,23 @@ credentials, can be limited per job, and leaves nothing to leak from the reposit
 **Why one narrow role per job.** The old CI user can create and delete infrastructure; the daily cost
 check only needs to read the bill. Email through SES is left out on purpose: alerts go to Telegram.
 
-**Left to do.** Ansible, deploy and Terraform still use the static key. They need their own roles
-(Environment jobs have `sub` = `repo:<owner>/<repo>:environment:<name>`), then the key and its secrets
-can be deleted.
+**Roles of the other workflows.** Terraform, Ansible and deploy get one role each per environment
+(`cost-optimizer-gh-<env>-terraform|ansible|deploy`), created in `terraform/bootstrap` because the
+Terraform role cannot create itself. Their jobs run in a GitHub Environment, so the token says
+`repo:<owner>/<repo>:environment:<env>` and only that environment can assume them. The workflows build
+the ARN from one variable, `AWS_ACCOUNT_ID`.
+
+- _Ansible_ may read the SSH key, find the nodes and write the kubeconfig secret of its environment.
+- _Deploy_ may push to the ECR repository of its environment and read the kubeconfig and database
+  secrets.
+- _Terraform_ is the widest, because it builds the environment. It is limited to one region, to the
+  IAM objects, secrets, buckets and state of its own environment, and it cannot attach AWS-managed
+  policies to roles. It could still write a broad policy of its own; stopping that needs a permissions
+  boundary, which is left out for now.
+- Plan and apply share one role, because their tokens look the same (same environment). Telling them
+  apart needs a custom token claim; the protection is the environment's required reviewers instead.
+
+**Left to do.** Delete the static key and the CI IAM user after every workflow has run once with OIDC.
 
 ## Known gaps
 
@@ -241,4 +255,3 @@ can be deleted.
 - `ingest_knowledge` is a manual step after deployment; it should become a Helm hook or a pipeline step.
 - The evaluation is not part of CI because it calls a paid API.
 - Peak duration is not an input of the cost estimate, so it reports a range instead of one expected figure.
-- Three workflows still use a static AWS key until their OIDC roles exist (see 12).
