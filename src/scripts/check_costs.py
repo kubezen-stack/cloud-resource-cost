@@ -9,10 +9,16 @@ from app.services.anomaly_advice import advise, format_advice
 from app.services.anomaly_alerts import anomalies_on, describe
 from app.services.anomaly_explain import describe_drivers, explain_spike, parse_usage_costs
 from app.services.anomaly_service import BASELINE_WINDOW, detect_anomalies
+from app.services.demo_data import DemoAdviceClient, DemoCostExplorer
 from app.services.llm_client import client_from_env
 
-TELEGRAM_BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
-TELEGRAM_CHAT_ID   = os.environ["TELEGRAM_CHAT_ID"]
+# DEMO=1 runs the whole job on invented data: no AWS account, and no Telegram or API key needed.
+DEMO = os.environ.get("DEMO") == "1"
+if DEMO:
+    os.environ.setdefault("BUDGET_LIMIT", "500")
+
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "") if DEMO else os.environ["TELEGRAM_BOT_TOKEN"]
+TELEGRAM_CHAT_ID   = os.environ.get("TELEGRAM_CHAT_ID", "") if DEMO else os.environ["TELEGRAM_CHAT_ID"]
 ENVIRONMENT        = os.environ.get("ENVIRONMENT", "dev")
 BUDGET_LIMIT       = float(os.environ.get("BUDGET_LIMIT", "30"))
 ANOMALY_THRESHOLD  = float(os.environ.get("ANOMALY_THRESHOLD", "10"))
@@ -30,8 +36,14 @@ REPORT_DAY    = (datetime.utcnow() - timedelta(days=2)).date()
 MAX_EXPLAINED = 3
 
 
+def ce_client():
+    if DEMO:
+        return DemoCostExplorer(REPORT_DAY)
+    return boto3.client("ce", region_name="us-east-1")
+
+
 def get_costs():
-    ce = boto3.client("ce", region_name="us-east-1")
+    ce = ce_client()
 
     mtd = ce.get_cost_and_usage(
         TimePeriod={"Start": MONTH_START, "End": TODAY},
@@ -67,7 +79,7 @@ def get_costs():
 
 def cost_explorer_pages(**params):
     """All result periods of a Cost Explorer query, following the pagination token."""
-    ce = boto3.client("ce", region_name="us-east-1")
+    ce = ce_client()
     results = []
     while True:
         page = ce.get_cost_and_usage(**params)
@@ -120,10 +132,13 @@ def get_advice(anomaly, drivers):
     if not drivers:
         return None
     llm = client_from_env()
+    if llm is None and DEMO:
+        llm = DemoAdviceClient(anomaly, drivers)
     if llm is None:
         return None
     try:
-        return format_advice(asyncio.run(_advise(llm, anomaly, drivers)))
+        text = format_advice(asyncio.run(_advise(llm, anomaly, drivers)))
+        return text + "\n_Demo advice: written by a script, not by a model._" if isinstance(llm, DemoAdviceClient) else text
     except Exception as exc:
         print(f"Advice skipped: {exc}")
         return None
@@ -139,6 +154,9 @@ def find_anomalies():
 
 
 def send_telegram(message):
+    if DEMO and not TELEGRAM_BOT_TOKEN:
+        print(message)
+        return
     payload = json.dumps({
         "chat_id": TELEGRAM_CHAT_ID,
         "text": message,
@@ -189,7 +207,8 @@ def main():
 
     def compose(with_advice):
         return (
-            f"{emoji} *AWS Cost Alert — {ENVIRONMENT.upper()}*\n\n"
+            ("🧪 *DEMO:* invented data, not a real bill\n\n" if DEMO else "")
+            + f"{emoji} *AWS Cost Alert — {ENVIRONMENT.upper()}*\n\n"
             f"{alert}\n\n"
             + (f"{with_advice}\n\n" if with_advice else "")
             + f"💰 MTD: `${mtd_cost}` / `${BUDGET_LIMIT}` ({budget_percent}%)\n"

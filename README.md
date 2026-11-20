@@ -14,6 +14,7 @@ Besides reading the bill, it explains it: an AI advisor that sizes an AWS archit
 - [Repository Structure](#repository-structure)
 - [Getting Started](#getting-started)
 - [Local Development](#local-development)
+- [Demo Without AWS](#demo-without-aws)
 - [Infrastructure](#infrastructure)
 - [Kubernetes & Helm](#kubernetes--helm)
 - [CI/CD Pipeline](#cicd-pipeline)
@@ -238,6 +239,27 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 API docs available at `http://localhost:8000/api/v1/openapi.json`.
+
+---
+
+## Demo Without AWS
+
+The daily cost alert can run on invented data, so the whole path (anomaly detector, usage-type breakdown, advice, message) can be seen without an AWS account, an API key or a bill. From the repository root:
+
+```bash
+pip install -r src/requirements.txt
+
+# Prints the notification to the terminal
+DEMO=1 PYTHONPATH=src python src/scripts/check_costs.py
+
+# Sends it to Telegram instead
+DEMO=1 TELEGRAM_BOT_TOKEN=... TELEGRAM_CHAT_ID=... PYTHONPATH=src python src/scripts/check_costs.py
+
+# Advice from a real model instead of the script (costs about a cent with gpt-4o-mini)
+DEMO=1 LLM_API_KEY=... LLM_MODEL=gpt-4o-mini PYTHONPATH=src python src/scripts/check_costs.py
+```
+
+The invented bill has five services with steady costs and a spike in NAT Gateway traffic two days ago. The run takes a few seconds and calls no AWS API. Every demo message starts with a `DEMO` line; without an API key the advice is written by a script (and says so), with a key it comes from the model and goes through the same checks as in production.
 
 ---
 
