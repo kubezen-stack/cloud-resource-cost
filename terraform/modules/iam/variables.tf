@@ -67,3 +67,15 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "enable_ssm" {
+  description = "Let EC2 instances register with AWS Systems Manager, so Session Manager can reach them without SSH"
+  type        = bool
+  default     = true
+}
+
+variable "ssm_bucket_arn" {
+  description = "ARN of the bucket Ansible uses to move files over Session Manager. If empty, instances get no access to a transfer bucket."
+  type        = string
+  default     = ""
+}

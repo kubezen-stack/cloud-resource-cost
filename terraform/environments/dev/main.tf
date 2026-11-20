@@ -120,6 +120,51 @@ module "s3" {
   backups_lifecycle_days = var.environment == "prod" ? 90 : 14
 }
 
+resource "aws_s3_bucket" "ssm_transfer" {
+  bucket        = "${local.hostname_tag}-ssm-transfer"
+  force_destroy = true
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "${local.hostname_tag}-ssm-transfer"
+    }
+  )
+}
+
+resource "aws_s3_bucket_public_access_block" "ssm_transfer" {
+  bucket = aws_s3_bucket.ssm_transfer.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "ssm_transfer" {
+  bucket = aws_s3_bucket.ssm_transfer.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "ssm_transfer" {
+  bucket = aws_s3_bucket.ssm_transfer.id
+
+  rule {
+    id     = "ExpireTransfers"
+    status = "Enabled"
+    filter {}
+
+    expiration {
+      days = 1
+    }
+  }
+}
+
 module "iam" {
   source               = "../../modules/iam"
   project_name         = var.project_name
@@ -129,6 +174,7 @@ module "iam" {
   enable_cost_explorer = var.enable_cost_explorer
   enable_vault_auth    = var.enable_vault_auth
   enable_ecr           = true
+  ssm_bucket_arn       = aws_s3_bucket.ssm_transfer.arn
   ecr_repository_arns  = []
 
   tags = local.common_tags

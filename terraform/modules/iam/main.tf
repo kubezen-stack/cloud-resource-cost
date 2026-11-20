@@ -310,6 +310,65 @@ resource "aws_iam_policy" "ecr_policy" {
   )
 }
 
+resource "aws_iam_policy" "ssm_policy" {
+  count       = var.enable_ssm ? 1 : 0
+  name        = "${local.hostname-tag}-ssm-policy"
+  description = "Policy for EC2 instances to register with Systems Manager (Session Manager) and use the transfer bucket"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = concat(
+      [
+        {
+          Effect = "Allow"
+          Action = [
+            "ssm:DescribeAssociation",
+            "ssm:DescribeDocument",
+            "ssm:GetDocument",
+            "ssm:GetManifest",
+            "ssm:ListAssociations",
+            "ssm:ListInstanceAssociations",
+            "ssm:PutInventory",
+            "ssm:UpdateAssociationStatus",
+            "ssm:UpdateInstanceAssociationStatus",
+            "ssm:UpdateInstanceInformation",
+            "ssmmessages:CreateControlChannel",
+            "ssmmessages:CreateDataChannel",
+            "ssmmessages:OpenControlChannel",
+            "ssmmessages:OpenDataChannel",
+            "ec2messages:AcknowledgeMessage",
+            "ec2messages:DeleteMessage",
+            "ec2messages:FailMessage",
+            "ec2messages:GetEndpoint",
+            "ec2messages:GetMessages",
+            "ec2messages:SendReply"
+          ]
+          Resource = "*"
+        }
+      ],
+      var.ssm_bucket_arn == "" ? [] : [
+        {
+          Effect   = "Allow"
+          Action   = ["s3:DeleteObject", "s3:GetObject", "s3:PutObject"]
+          Resource = "${var.ssm_bucket_arn}/*"
+        },
+        {
+          Effect   = "Allow"
+          Action   = ["s3:GetBucketLocation"]
+          Resource = var.ssm_bucket_arn
+        }
+      ]
+    )
+  })
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "${local.hostname-tag}-ssm-policy-${var.environment}"
+    }
+  )
+}
+
 resource "aws_iam_role_policy_attachment" "ec2_role_policy_attachment" {
   role       = aws_iam_role.ec2_role.name
   policy_arn = aws_iam_policy.ec2_policy.arn
@@ -349,6 +408,12 @@ resource "aws_iam_role_policy_attachment" "ecr_policy_attachment" {
   count      = var.enable_ecr ? 1 : 0
   role       = aws_iam_role.ec2_role.name
   policy_arn = aws_iam_policy.ecr_policy[0].arn
+}
+
+resource "aws_iam_role_policy_attachment" "ssm_policy_attachment" {
+  count      = var.enable_ssm ? 1 : 0
+  role       = aws_iam_role.ec2_role.name
+  policy_arn = aws_iam_policy.ssm_policy[0].arn
 }
 
 resource "aws_iam_instance_profile" "ec2_instance_profile" {

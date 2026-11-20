@@ -109,6 +109,51 @@ data "aws_iam_policy_document" "ansible" {
     ]
     resources = ["arn:aws:secretsmanager:${var.aws_region}:${local.account_id}:secret:${var.project_name}-${each.key}-kubeconfig-*"]
   }
+
+  statement {
+    sid       = "SessionToNodes"
+    actions   = ["ssm:StartSession"]
+    resources = ["arn:aws:ec2:${var.aws_region}:${local.account_id}:instance/*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "ssm:resourceTag/Environment"
+      values   = [each.key]
+    }
+  }
+
+  statement {
+    sid     = "SessionDocument"
+    actions = ["ssm:StartSession"]
+    resources = [
+      "arn:aws:ssm:${var.aws_region}:${local.account_id}:document/SSM-SessionManagerRunShell",
+      "arn:aws:ssm:${var.aws_region}::document/AWS-StartNonInteractiveCommand",
+    ]
+  }
+
+  statement {
+    sid       = "EndSessions"
+    actions   = ["ssm:ResumeSession", "ssm:TerminateSession"]
+    resources = ["arn:aws:ssm:${var.aws_region}:${local.account_id}:session/*"]
+  }
+
+  statement {
+    sid       = "SeeSessions"
+    actions   = ["ssm:DescribeInstanceInformation", "ssm:DescribeSessions", "ssm:GetConnectionStatus"]
+    resources = ["*"]
+  }
+
+  statement {
+    sid       = "TransferFiles"
+    actions   = ["s3:DeleteObject", "s3:GetObject", "s3:PutObject"]
+    resources = ["arn:aws:s3:::${var.project_name}-${each.key}-ssm-transfer/*"]
+  }
+
+  statement {
+    sid       = "TransferBucket"
+    actions   = ["s3:GetBucketLocation", "s3:ListBucket"]
+    resources = ["arn:aws:s3:::${var.project_name}-${each.key}-ssm-transfer"]
+  }
 }
 
 data "aws_iam_policy_document" "deploy" {

@@ -77,3 +77,8 @@ output "ec2_eips" {
   description = "Elastic IPs of EC2 instances"
   value       = module.ec2.ec2_eips
 }
+
+output "ssm_transfer_bucket" {
+  description = "Bucket Ansible uses to move files over Session Manager"
+  value       = aws_s3_bucket.ssm_transfer.id
+}

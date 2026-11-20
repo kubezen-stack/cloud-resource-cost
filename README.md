@@ -92,7 +92,9 @@ The application interacts with the **AWS Cost Explorer API** by assuming IAM rol
 .
 ├── .github/workflows/
 │   ├── ansible.yml          # Cluster provisioning workflow
+│   ├── cost-alerts.yml      # Daily cost check and Telegram alerts
 │   ├── deploy.yml           # Build, test, and deploy workflow
+│   ├── terraform-checks.yml # fmt, validate and checkov for Terraform
 │   └── terraform.yml        # Infrastructure lifecycle workflow
 ├── ansible/
 │   ├── inventory/dev/       # AWS EC2 dynamic inventory
@@ -133,14 +135,37 @@ The application interacts with the **AWS Cost Explorer API** by assuming IAM rol
 - kubectl and Helm 3
 - GitHub PAT with `repo` scope (for self-hosted runner registration)
 
+### AWS access (OIDC)
+
+Workflows sign in to AWS with short-lived OIDC roles, so no AWS access key is stored in GitHub. The
+roles are created once from `terraform/bootstrap`, with administrator credentials:
+
+```bash
+cd terraform/bootstrap
+terraform init && terraform apply
+terraform output aws_account_id
+```
+
+Each workflow runs in a GitHub Environment (`dev`, `stage`) and can assume only the roles of that
+environment. See `docs/DECISIONS.md` (OIDC) for the permissions of every role.
+
+### Required GitHub Variables
+
+Configure these in **Settings → Secrets and variables → Actions → Variables**:
+
+| Variable | Description |
+|----------|-------------|
+| `AWS_ACCOUNT_ID` | AWS account ID (`terraform output aws_account_id`); workflows build the role ARNs from it |
+| `AWS_COST_ALERTS_ROLE_ARN` | Role of the Cost Alerts workflow (`terraform output github_cost_alerts_role_arn`) |
+| `BUDGET_LIMIT` | Monthly budget in dollars for the cost alerts |
+| `ANOMALY_THRESHOLD` | Daily cost in dollars that triggers the simple anomaly alert |
+
 ### Required GitHub Secrets
 
-Configure these in **Settings → Secrets and variables → Actions** before running any workflow:
+Configure these in **Settings → Secrets and variables → Actions → Secrets** before running any workflow:
 
 | Secret | Description |
 |--------|-------------|
-| `AWS_ACCESS_KEY_ID` | AWS access key ID |
-| `AWS_SECRET_ACCESS_KEY` | AWS secret access key |
 | `AWS_REGION` | AWS region (e.g. `us-east-1`) |
 | `DEV_SECRET_KEY` | Application JWT secret key |
 | `DEV_DB_PASSWORD` | PostgreSQL password for dev |

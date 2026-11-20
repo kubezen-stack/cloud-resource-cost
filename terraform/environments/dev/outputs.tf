@@ -72,3 +72,8 @@ output "key_name" {
   description = "The name of the EC2 key pair"
   value       = aws_key_pair.deployer_key.key_name
 }
+
+output "ssm_transfer_bucket" {
+  description = "Bucket Ansible uses to move files over Session Manager"
+  value       = aws_s3_bucket.ssm_transfer.id
+}
